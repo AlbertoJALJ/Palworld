@@ -16,6 +16,7 @@ from palworld_api.models import (
     Confidence,
     Dataset,
     Element,
+    Gender,
     InheritanceConfig,
     Pal,
     Passive,
@@ -49,7 +50,7 @@ def dataset() -> Dataset:
         _pal("p20", 20),
         # The goal pal: reachable only by breeding, never caught in the wild.
         _pal("apex", 30, wild_obtainable=False, elements=(Element.DARK,)),
-        _pal("p50", 50),
+        _pal("p50", 50, elements=(Element.FIRE,)),
         _pal("p100", 100),
         _pal("p200", 200),
         _pal("p400", 400),
@@ -111,6 +112,15 @@ def dataset() -> Dataset:
             provenance=SEED,
         ),
         Passive(
+            id="pyromaniac",
+            name="Pyromaniac",
+            tier=2,
+            effects=(
+                PassiveEffect(stat=Stat.ELEMENT_DAMAGE, value=30.0, element=Element.FIRE),
+            ),
+            provenance=SEED,
+        ),
+        Passive(
             id="apex_only",
             name="Apex Only",
             tier=3,
@@ -122,6 +132,19 @@ def dataset() -> Dataset:
     combos = [
         # Overrides the formula, which would otherwise give something near 900.
         SpecialCombo(parents=("p800", "p1000"), child="apex", provenance=SEED),
+        # One pair, two children, decided by which parent is which sex.
+        SpecialCombo(
+            parents=("p20", "p50"),
+            child="p10",
+            parent_genders=(Gender.MALE, Gender.FEMALE),
+            provenance=SEED,
+        ),
+        SpecialCombo(
+            parents=("p20", "p50"),
+            child="apex",
+            parent_genders=(Gender.FEMALE, Gender.MALE),
+            provenance=SEED,
+        ),
     ]
     return Dataset(
         game_version="test",

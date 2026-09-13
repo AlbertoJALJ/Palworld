@@ -173,7 +173,7 @@ class RoutePlanner:
             else (lambda x, y: x + y + 1)
         )
 
-        table = self.engine.table
+        outcomes = self.engine.outcomes
         best: dict[str, int] = {pal: 0 for pal in owned_ids}
         via: dict[str, tuple[str, str]] = {}
         finalized: dict[str, int] = {}
@@ -195,16 +195,18 @@ class RoutePlanner:
             # (itself included). Every valid pair is therefore considered
             # exactly once, when its second member is finalised.
             for other, other_cost in finalized.items():
-                child = table.get(_pair_key(pal, other))
-                if child is None or child in finalized:
-                    continue
-                new_cost = combine(cost, other_cost)
-                if max_generations is not None and new_cost > max_generations:
-                    continue
-                if new_cost < best.get(child, 1 << 30):
-                    best[child] = new_cost
-                    via[child] = (pal, other)
-                    heappush(heap, _QueueItem(new_cost, child))
+                # A pair usually has one child, but a gender-dependent pair has
+                # two and both are obtainable, so relax towards every outcome.
+                for child in outcomes.get(_pair_key(pal, other), ()):
+                    if child in finalized:
+                        continue
+                    new_cost = combine(cost, other_cost)
+                    if max_generations is not None and new_cost > max_generations:
+                        continue
+                    if new_cost < best.get(child, 1 << 30):
+                        best[child] = new_cost
+                        via[child] = (pal, other)
+                        heappush(heap, _QueueItem(new_cost, child))
 
         return best, via, finalized
 
@@ -233,6 +235,12 @@ class RoutePlanner:
             if expanded:
                 pair = via[node]
                 result = self.engine.breed(*pair)
+                # `breed` reports the pair's primary child; this step may be the
+                # gender-dependent alternative instead, which is still a
+                # special-combo step but with a sex requirement attached.
+                rule = result.rule
+                if result.child != node:
+                    rule = "special"
                 generation = max(depth[pair[0]], depth[pair[1]]) + 1
                 depth[node] = generation
                 emitted.add(node)
@@ -241,7 +249,7 @@ class RoutePlanner:
                         parent_a=pair[0],
                         parent_b=pair[1],
                         child=node,
-                        rule=result.rule,
+                        rule=rule,
                         generation=generation,
                     )
                 )

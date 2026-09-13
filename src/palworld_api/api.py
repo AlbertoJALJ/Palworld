@@ -27,7 +27,7 @@ from .models import Element, Work
 from .passives import PROFILES, PassiveEngine
 from .routes import RouteError, RoutePlanner, Strategy
 
-DEFAULT_DATASET = Path(os.environ.get("PALWORLD_DATASET", "data/demo.json"))
+DEFAULT_DATASET = Path(os.environ.get("PALWORLD_DATASET", "data/pals.json"))
 WEB_DIR = Path(__file__).parent / "web"
 
 
@@ -41,7 +41,7 @@ class Services:
         self.breeding = BreedingEngine(self.index)
         self.planner = RoutePlanner(self.index, self.breeding)
         self.passives = PassiveEngine(self.index)
-        self.inheritance = InheritanceEngine(self.dataset.inheritance)
+        self.inheritance = InheritanceEngine(self.dataset.inheritance, self.index)
 
     @property
     def data_warning(self) -> str | None:
@@ -92,6 +92,9 @@ class BreedResponse(BaseModel):
     child: str
     rule: str
     target_rank: int | None
+    # Populated only for the rare pairs whose child depends on the parents' sexes.
+    alternatives: list[str] = Field(default_factory=list)
+    gender_requirement: str | None = None
     data_quality: DataQuality
 
 
@@ -101,6 +104,7 @@ class RouteStepResponse(BaseModel):
     parent_b: str
     child: str
     rule: str
+    gender_requirement: str | None = None
 
 
 class RouteResponse(BaseModel):
@@ -162,6 +166,22 @@ class InheritanceResponse(BaseModel):
     achieved: list[str]
     unreachable_passives: list[str]
     data_quality: DataQuality
+
+
+def _gender_note(services: Services, step) -> str | None:
+    """The sex requirement for a step, when the pair has more than one child.
+
+    Without this a route can look impossible to follow: the player breeds the
+    pair, gets the other child, and has no way to know why.
+    """
+    pair = (step.parent_a, step.parent_b)
+    if pair[0] > pair[1]:
+        pair = (pair[1], pair[0])
+    combos = services.index.combos_by_pair.get(pair, ())
+    if len(combos) < 2:
+        return None
+    match = next((c for c in combos if c.child == step.child), None)
+    return match.describe_genders() if match else None
 
 
 def _quality(services: Services) -> DataQuality:
@@ -262,6 +282,8 @@ def breed(parent_a: str, parent_b: str, services: ServicesDep) -> BreedResponse:
         child=result.child,
         rule=result.rule,
         target_rank=result.target_rank,
+        alternatives=list(result.alternatives),
+        gender_requirement=result.gender_requirement,
         data_quality=_quality(services),
     )
 
@@ -337,6 +359,7 @@ def route(
                 parent_b=s.parent_b,
                 child=s.child,
                 rule=s.rule,
+                gender_requirement=_gender_note(services, s),
             )
             for s in plan.steps
         ],

@@ -10,47 +10,72 @@ base work or for combat?"* — with the odds of actually breeding it.
 
 ---
 
-## Status: the engine is done, the data is not
+## Data
 
-Everything in `src/palworld_api/` works and is tested. What ships with it is a
-**demo dataset of invented pals** (`data/demo.json`), not real game data.
+The API ships with **real data, read out of the game's own DataTables** —
+`DT_PalMonsterParameter`, `DT_PalCombiUnique` and `DT_PassiveSkill_Main`, the
+tables the game itself reads. 288 pals, 282 passives, 184 unique breeding pairs.
+No scraping, no wiki lag behind a patch, no parsing guesswork.
 
-The scraper that produces real data is written and its parsing logic is tested,
-but **its selectors have never run against the live site** — the environment it
-was written in blocks outbound access to the source. So:
+It is **cross-checked against a second, independent extraction**. Two people
+extracting the same game files should agree on every breeding rank; where they
+do not, one is wrong, and a route planned on the wrong one is wrong in a way
+nothing else here would catch. Currently 288/288 ranks agree and no combo exists
+in this dataset that the reference does not have. The check is a command, so it
+can be re-run against each patch:
 
-- The engine, API and web UI are verified end to end. 108 tests pass.
-- The scraper's HTML parsing is verified against three markup layouts.
-- Whether those layouts match the real site is **unknown**. Validate it before
-  trusting a full run:
+```bash
+python -m palworld_api.ingest.cli crosscheck data/pals.json <reference-build-dir>
+```
+
+### Regenerating it
+
+```bash
+python -m palworld_api.ingest.cli gamefiles <extraction-root> --output data/pals.json
+```
+
+`<extraction-root>` is a directory holding `Pal/Content/...` from a UE asset
+extraction — produced with FModel or repak against your own install, or taken
+from one of the community extraction repositories. The adapter reports what it
+skipped and why; warnings naming pals with no shipped display name are
+unreleased content and are expected.
+
+> **Licensing.** The dataset is factual game data (names, ranks, stats) derived
+> from Pocketpair's files. Redistributing it is normal practice across Palworld
+> tooling, but it is your call: `data/pals.json` is regenerable from any
+> extraction in one command, so it can be deleted from the repo without losing
+> anything.
+
+### The other two sources
+
+`data/demo.json` is a synthetic dataset of deliberately invented pals, used for
+smoke-testing the API without touching real data. A demo built from real pal
+names with placeholder numbers is indistinguishable from real data three screens
+into a JSON response, and someone would eventually plan a real breeding run on
+numbers that were never measured.
+
+`ingest/paldb.py` scrapes a community wiki. It is a fallback, kept because it
+needs no extraction step — but **its selectors have never run against the live
+site**, since the environment it was written in blocks outbound access to the
+source. Validate it before trusting it:
 
 ```bash
 python -m palworld_api.ingest.cli inspect https://paldb.cc/en/Anubis
 python -m palworld_api.ingest.cli scrape --limit 5
 ```
 
-`inspect` prints every label/value pair the parser finds on one page plus the
-`Pal` it built. If a field is missing, add the site's label to the relevant
-`*_LABELS` tuple in `ingest/paldb.py` — that is the intended fix, and it needs
-no code changes.
-
-Also check the source's terms of use before scraping it. The client honours
-`robots.txt`, rate limits, and caches everything, but permission is a separate
-question from politeness.
-
-Every API response carries a `data_quality` block, so a client can tell demo
-data from verified data without reading this file.
-
----
+Every API response carries a `data_quality` block, so a client can tell
+game-file data from wiki or demo data without reading this file.
 
 ## Quick start
 
 ```bash
 pip install -e ".[dev]"
-
-python -m palworld_api.ingest.cli demo --output data/demo.json
-PALWORLD_DATASET=data/demo.json uvicorn palworld_api.api:app --reload
+uvicorn palworld_api.api:app --reload
 ```
+
+That serves `data/pals.json`, the real dataset, which is already in the repo.
+Point `PALWORLD_DATASET` elsewhere to serve a different one.
 
 - Web UI: <http://127.0.0.1:8000/>
 - OpenAPI docs: <http://127.0.0.1:8000/docs>
@@ -65,6 +90,17 @@ Three rules, in priority order:
 2. **Same species** — always breeds true.
 3. **The rank formula** — `target = floor((rank_a + rank_b + 1) / 2)`, then the
    breedable child whose `combi_rank` is nearest to `target`.
+
+Two things the game data makes explicit that a wiki tends to bury:
+
+- **`IgnoreCombi`** marks a pal the rank formula must never touch, in either
+  direction. Those pals still breed, but only through an explicit unique combo —
+  which is exactly how the legendaries end up able to produce nothing but
+  themselves. No special-casing needed: rule 1 already runs first.
+- **One pair in the entire game depends on the parents' sexes.** Katress + Wixen
+  makes Katress Ignis or Wixen Noct depending on which is female. A model with
+  one child per pair silently loses one of the two, so `SpecialCombo` carries
+  optional genders and the route planner treats both children as reachable.
 
 ### Why routes are non-trivial
 
@@ -114,6 +150,10 @@ Three things the scoring gets right that a hand-written tier list does not:
 - **Work passives are worthless on a pal that cannot work.** Work-speed scoring
   scales with the pal's best work suitability, so a combat-only pal never gets
   recommended a work passive.
+- **Element buffs only count for pals of that element.** A passive granting
+  +30% fire and +30% electric damage is worth exactly nothing on a ground pal.
+  Counting it anyway put four useless passives at the top of Anubis's combat
+  list, ahead of Legend, until this was fixed.
 
 ---
 
@@ -148,7 +188,7 @@ expected number of eggs, and the eggs needed for 90% confidence.
 | `GET /health` | Dataset contents and data quality |
 | `GET /pals` | List/filter by element, work, breedability, name |
 | `GET /pals/{id}` | Full record |
-| `GET /breed?parent_a=&parent_b=` | What one pair produces, and by which rule |
+| `GET /breed?parent_a=&parent_b=` | What one pair produces, by which rule, and any sex requirement |
 | `GET /pals/{id}/parents` | Every pair that produces this pal |
 | `GET /pals/{id}/children` | What this pal produces with every partner |
 | `GET /routes/{target}` | Cheapest route, plus alternatives for the final step |
@@ -158,14 +198,25 @@ expected number of eggs, and the eggs needed for 90% confidence.
 | `POST /routes/plan` | A route costed out for the passives you want |
 
 ```bash
-curl "localhost:8000/routes/demo_sovereign"
-curl "localhost:8000/pals/demo_forge/passives?goal=base"
+# 19 generations and 75 crosses, from the three starter pals to Anubis.
+curl "localhost:8000/routes/Anubis?owned=Lamball&owned=Cattiva&owned=Chikipi"
+
+curl "localhost:8000/pals/Anubis/passives?goal=base"
+
+# The one pair in the game whose child depends on the parents' sexes.
+curl "localhost:8000/breed?parent_a=Katress&parent_b=Wixen"
+
+# The same route, costed out in eggs for the passives you want to carry: ~120.
 curl -X POST localhost:8000/routes/plan -H 'content-type: application/json' -d '{
-  "target": "demo_sovereign",
-  "desired_passives": ["demo_legend", "demo_ferocious"],
-  "starting_passives": {"demo_titan": ["demo_legend"], "demo_shade": ["demo_ferocious"]}
+  "target": "Anubis",
+  "owned": ["Lamball", "Cattiva", "Chikipi"],
+  "desired_passives": ["Legend", "Musclehead"],
+  "starting_passives": {"Lamball": ["Legend"], "Cattiva": ["Musclehead"]}
 }'
 ```
+
+Display names and internal ids are interchangeable everywhere: Lamball's id is
+`sheepball`, and Musclehead's is `noukin`.
 
 ---
 
@@ -181,7 +232,11 @@ src/palworld_api/
   inheritance.py  Exact inheritance odds, and eggs-per-step
   api.py          FastAPI surface
   web/            The UI the API serves at /
-  ingest/         Everything that talks to the outside world
+  ingest/
+    gamefiles.py  The game's own DataTables. The real source.
+    paldb.py      Community-wiki scraper. Fallback, selectors unvalidated.
+    demo.py       Synthetic pals, for smoke tests
+    cli.py        Build, validate, cross-check
 ```
 
 The dependency runs one way: nothing in `ingest/` is imported by the engine, so
@@ -209,7 +264,7 @@ were never measured.
 ## Development
 
 ```bash
-python -m pytest        # 108 tests
+python -m pytest        # 140 tests
 python -m ruff check src tests
 ```
 

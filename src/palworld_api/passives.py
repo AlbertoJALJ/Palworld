@@ -18,7 +18,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from .dataset import PalIndex
-from .models import Pal, Passive, Stat, Work
+from .models import Pal, Passive, PassiveEffect, Stat, Work
 
 # Reducing a loss is a gain, so the loss stats carry negative weights: a passive
 # whose effect value is -15 on SANITY_LOSS scores positively against them.
@@ -114,7 +114,9 @@ class PassiveEngine:
     ) -> ScoredPassive:
         """Score one passive. Work-suitability relevance scales base scoring."""
         raw = sum(
-            effect.value * profile.weight_for(effect.stat) for effect in passive.effects
+            effect.value * profile.weight_for(effect.stat)
+            for effect in passive.effects
+            if self._effect_applies(effect, pal)
         )
 
         # A work-speed buff is only worth anything on a pal that actually works,
@@ -142,6 +144,22 @@ class PassiveEngine:
             exclusive_group=passive.exclusive_group,
             innate=pal is not None and passive.id in pal.innate_passives,
         )
+
+    @staticmethod
+    def _effect_applies(effect: PassiveEffect, pal: Pal | None) -> bool:
+        """Whether an effect does anything for this particular pal.
+
+        An element-scoped damage buff only helps a pal that deals that element:
+        a passive granting +30% fire and +30% electric damage is worth exactly
+        nothing on a ground pal, and counting it would rank flashy but useless
+        passives above the ones that actually help.
+        """
+        if effect.stat is not Stat.ELEMENT_DAMAGE or effect.element is None:
+            return True
+        if pal is None:
+            # No pal in context: score it generically rather than guessing.
+            return True
+        return effect.element in pal.elements
 
     @staticmethod
     def _work_relevance(pal: Pal) -> float:

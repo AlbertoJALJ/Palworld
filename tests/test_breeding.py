@@ -95,10 +95,13 @@ def test_table_is_symmetric_and_complete(engine: BreedingEngine) -> None:
             assert key in engine.table, f"missing pair {key}"
 
 
-def test_inverse_index_agrees_with_table(engine: BreedingEngine) -> None:
+def test_inverse_index_agrees_with_outcomes(engine: BreedingEngine) -> None:
     for child, pairs in engine.parents_of.items():
         for pair in pairs:
-            assert engine.table[pair] == child
+            # A gender-dependent pair has two children, so the inverse index
+            # points at a pair whose outcomes contain -- not necessarily equal
+            # -- this child.
+            assert child in engine.outcomes[pair]
 
 
 def test_pairs_producing_finds_the_special_combo(engine: BreedingEngine) -> None:
@@ -125,3 +128,33 @@ def test_formula_never_leaves_the_parents_rank_range(engine: BreedingEngine) -> 
         # sit just outside the bracket, but never by more than the gap to the
         # nearest neighbour on that side.
         assert index.require(child).combi_rank is not None
+
+
+def test_gendered_pair_reports_both_children(engine: BreedingEngine) -> None:
+    """One pair, two possible children, decided by the parents' sexes.
+
+    The game has exactly one such pair (Katress + Wixen). Collapsing it to a
+    single child silently loses one of the two pals it can make.
+    """
+    result = engine.breed("p20", "p50")
+    assert result.rule == "special"
+    assert {result.child, *result.alternatives} == {"p10", "apex"}
+
+
+def test_gendered_pair_states_its_requirement(engine: BreedingEngine) -> None:
+    result = engine.breed("p20", "p50")
+    assert result.gender_requirement is not None
+    assert "must be" in result.gender_requirement
+
+
+def test_both_gendered_children_are_obtainable(engine: BreedingEngine) -> None:
+    assert engine.outcomes[("p20", "p50")] == ("p10", "apex") or engine.outcomes[
+        ("p20", "p50")
+    ] == ("apex", "p10")
+
+
+def test_both_gendered_children_list_the_pair_as_a_parent(
+    engine: BreedingEngine,
+) -> None:
+    for child in ("p10", "apex"):
+        assert ("p20", "p50") in engine.pairs_producing(child)

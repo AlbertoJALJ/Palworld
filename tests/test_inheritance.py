@@ -162,3 +162,33 @@ def test_config_rejects_weights_that_do_not_sum_to_one() -> None:
 def test_config_rejects_negative_weights() -> None:
     with pytest.raises(ValueError, match="non-negative"):
         InheritanceConfig(inherited_count_weights=(1.5, -0.5))
+
+
+def test_display_names_resolve_to_ids(planner, index) -> None:
+    """Names and ids must be interchangeable, as they are everywhere else.
+
+    A pal's internal id rarely matches its display name (Lamball is
+    `sheepball`), so an unresolved name would silently look like a parent that
+    carries nothing -- a zero-probability route with no visible cause.
+    """
+    plan = planner.plan("APEX", owned=["p10", "p1000"])
+    engine = InheritanceEngine(CONFIG, index)
+    annotated = engine.annotate_route(
+        plan,
+        desired=["Fierce"],
+        starting_passives={"P10": ["Fierce"]},
+    )
+    assert annotated.desired == ("fierce",)
+    assert annotated.achieved == ("fierce",)
+
+
+def test_without_an_index_ids_are_still_required(planner) -> None:
+    plan = planner.plan("apex", owned=["p10", "p1000"])
+    engine = InheritanceEngine(CONFIG)
+    annotated = engine.annotate_route(
+        plan, desired=["Fierce"], starting_passives={"P10": ["Fierce"]}
+    )
+    # No resolver, so the display names never match the route's ids. The result
+    # is honest about it rather than pretending the passive was delivered.
+    assert annotated.achieved == ()
+    assert annotated.unreachable_passives == ("Fierce",)

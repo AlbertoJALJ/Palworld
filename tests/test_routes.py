@@ -13,7 +13,10 @@ def _assert_well_ordered(plan, planner: RoutePlanner) -> None:
     for step in plan.steps:
         assert step.parent_a in have, f"{step.parent_a} not available yet"
         assert step.parent_b in have, f"{step.parent_b} not available yet"
-        assert planner.engine.breed(step.parent_a, step.parent_b).child == step.child
+        pair = (step.parent_a, step.parent_b)
+        if pair[0] > pair[1]:
+            pair = (pair[1], pair[0])
+        assert step.child in planner.engine.outcomes[pair]
         have.add(step.child)
     if plan.steps:
         assert plan.target in have
@@ -124,4 +127,4 @@ def test_alternatives_are_all_actually_reachable(planner: RoutePlanner) -> None:
     reachable = planner.reachable_from(["p10", "p1000"])
     for pair in planner.alternatives("apex", owned=["p10", "p1000"]):
         assert pair[0] in reachable and pair[1] in reachable
-        assert planner.engine.breed(*pair).child == "apex"
+        assert "apex" in planner.engine.outcomes[pair]

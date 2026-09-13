@@ -39,6 +39,10 @@ class BreedingResult:
     child: str
     rule: str  # "special" | "same_species" | "formula"
     target_rank: int | None = None
+    # Other children the same pair can produce. Non-empty only for the rare
+    # pairs whose outcome depends on which parent is which sex.
+    alternatives: tuple[str, ...] = ()
+    gender_requirement: str | None = None
 
 
 def _pair_key(a: str, b: str) -> tuple[str, str]:
@@ -69,9 +73,20 @@ class BreedingEngine:
     def _breed_pals(self, pal_a: Pal, pal_b: Pal) -> BreedingResult:
         key = _pair_key(pal_a.id, pal_b.id)
 
-        special = self.index.special_combos.get(key)
-        if special is not None:
-            return BreedingResult(key[0], key[1], special, "special")
+        combos = self.index.combos_by_pair.get(key)
+        if combos:
+            # Prefer an outcome with no gender requirement; report the rest so a
+            # caller can see the pair has a second possible child.
+            primary = next((c for c in combos if not c.is_gendered), combos[0])
+            others = tuple(c.child for c in combos if c.child != primary.child)
+            return BreedingResult(
+                key[0],
+                key[1],
+                primary.child,
+                "special",
+                alternatives=others,
+                gender_requirement=primary.describe_genders(),
+            )
 
         if not pal_a.is_breedable_parent:
             raise BreedingError(f"{pal_a.id!r} cannot be used as a parent")
@@ -104,9 +119,14 @@ class BreedingEngine:
             return None
 
     @cached_property
-    def table(self) -> dict[tuple[str, str], str]:
-        """Every valid unordered pair mapped to its child."""
-        result: dict[tuple[str, str], str] = {}
+    def outcomes(self) -> dict[tuple[str, str], tuple[str, ...]]:
+        """Every valid unordered pair mapped to every child it can produce.
+
+        Almost always one child. A pair whose result depends on the parents'
+        sexes has two, and both are genuinely obtainable, so route planning
+        must see both.
+        """
+        result: dict[tuple[str, str], tuple[str, ...]] = {}
         parents = self.index.parent_pool
         for i, pal_a in enumerate(parents):
             for pal_b in parents[i:]:
@@ -114,22 +134,34 @@ class BreedingEngine:
                     outcome = self._breed_pals(pal_a, pal_b)
                 except BreedingError:
                     continue
-                result[_pair_key(pal_a.id, pal_b.id)] = outcome.child
+                result[_pair_key(pal_a.id, pal_b.id)] = (
+                    outcome.child,
+                    *outcome.alternatives,
+                )
 
         # Special combos may name parents outside the ordinary parent pool
-        # (a unique that can breed but never be hatched, say), so fold them in
+        # (a legendary excluded from the rank formula, say), so fold them in
         # separately rather than relying on the loop above to have seen them.
-        for key, child in self.index.special_combos.items():
-            result[key] = child
+        for key, combos in self.index.combos_by_pair.items():
+            result[key] = tuple(dict.fromkeys(c.child for c in combos))
         return result
 
     @cached_property
+    def table(self) -> dict[tuple[str, str], str]:
+        """Every valid unordered pair mapped to its primary child.
+
+        Convenience view over `outcomes` for the common single-child case.
+        """
+        return {pair: children[0] for pair, children in self.outcomes.items()}
+
+    @cached_property
     def parents_of(self) -> dict[str, tuple[tuple[str, str], ...]]:
-        """Inverse of `table`: child id -> every pair that produces it."""
+        """Inverse of `outcomes`: child id -> every pair that produces it."""
         inverse: dict[str, list[tuple[str, str]]] = {}
-        for pair, child in self.table.items():
-            inverse.setdefault(child, []).append(pair)
-        return {child: tuple(sorted(pairs)) for child, pairs in inverse.items()}
+        for pair, children in self.outcomes.items():
+            for child in children:
+                inverse.setdefault(child, []).append(pair)
+        return {child: tuple(sorted(set(pairs))) for child, pairs in inverse.items()}
 
     def pairs_producing(self, child_id: str) -> tuple[tuple[str, str], ...]:
         """Every parent pair that yields `child_id`."""

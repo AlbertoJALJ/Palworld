@@ -134,3 +134,59 @@ def test_unknown_pal_and_goal_raise(passive_engine: PassiveEngine) -> None:
         passive_engine.recommend("nope", "combat")
     with pytest.raises(KeyError, match="unknown goal"):
         passive_engine.recommend("p10", "sandwich")
+
+
+def test_element_buffs_only_count_for_matching_pals(
+    passive_engine: PassiveEngine,
+) -> None:
+    """A fire-damage buff does nothing for a pal that deals no fire damage.
+
+    Without this the optimiser ranks flashy element passives above the ones
+    that actually help, because it counts damage the pal can never deal.
+    """
+    pyromaniac = passive_engine.index.resolve_passive("pyromaniac")
+    fire_pal = passive_engine.index.require("p50")
+    other_pal = passive_engine.index.require("p10")
+
+    assert passive_engine.score_passive(pyromaniac, COMBAT_PROFILE, fire_pal).score > 0
+    assert passive_engine.score_passive(pyromaniac, COMBAT_PROFILE, other_pal).score == 0
+
+
+def test_element_buffs_are_offered_to_the_right_pal(
+    passive_engine: PassiveEngine,
+) -> None:
+    assert "pyromaniac" in _ids(passive_engine.recommend("p50", "combat"))
+    assert "pyromaniac" not in _ids(passive_engine.recommend("p10", "combat"))
+
+
+def test_element_buffs_score_generically_without_a_pal(
+    passive_engine: PassiveEngine,
+) -> None:
+    # No pal in context means no basis to zero it out; score it at face value.
+    pyromaniac = passive_engine.index.resolve_passive("pyromaniac")
+    assert passive_engine.score_passive(pyromaniac, COMBAT_PROFILE, None).score > 0
+
+
+def test_a_passive_that_trades_work_speed_for_sanity_still_scores(
+    passive_engine: PassiveEngine,
+) -> None:
+    """Mirrors the real "Demon's Hand": big work buff, faster sanity drain.
+
+    A positive sanity_loss value is a penalty, and the negative base weight has
+    to turn it into one rather than quietly adding to the score.
+    """
+    from palworld_api.models import Passive, PassiveEffect
+    from palworld_api.models import Stat as S
+
+    trade = Passive(
+        id="tradeoff",
+        name="Tradeoff",
+        effects=(
+            PassiveEffect(stat=S.WORK_SPEED, value=90.0),
+            PassiveEffect(stat=S.SANITY_LOSS, value=15.0),
+        ),
+    )
+    pal = passive_engine.index.require("p10")
+    scored = passive_engine.score_passive(trade, BASE_PROFILE, pal)
+    assert scored.score == pytest.approx(90.0 - 15.0 * 0.8)
+    assert scored.score < 90.0

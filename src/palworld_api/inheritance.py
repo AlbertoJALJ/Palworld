@@ -26,6 +26,7 @@ import math
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 
+from .dataset import PalIndex
 from .models import InheritanceConfig
 from .routes import RoutePlan
 
@@ -149,10 +150,30 @@ def odds_for_pair(
 
 
 class InheritanceEngine:
-    """Applies the inheritance model along a planned breeding route."""
+    """Applies the inheritance model along a planned breeding route.
 
-    def __init__(self, config: InheritanceConfig) -> None:
+    Give it a `PalIndex` and it will accept display names as well as ids for
+    both pals and passives. Without one, callers must pass ids: a name that
+    does not resolve would otherwise be silently treated as a passive nobody
+    owns, and the route would come back reporting zero chance for no visible
+    reason.
+    """
+
+    def __init__(self, config: InheritanceConfig, index: PalIndex | None = None) -> None:
         self.config = config
+        self.index = index
+
+    def _passive_id(self, ref: str) -> str:
+        if self.index is None:
+            return ref
+        passive = self.index.resolve_passive(ref)
+        return passive.id if passive is not None else ref
+
+    def _pal_id(self, ref: str) -> str:
+        if self.index is None:
+            return ref
+        pal = self.index.resolve(ref)
+        return pal.id if pal is not None else ref
 
     def odds(
         self,
@@ -177,12 +198,16 @@ class InheritanceEngine:
         desired passive that its parents can actually supply, which is how the
         breeding is done in practice, and reports what that costs.
         """
-        desired_order = tuple(dict.fromkeys(desired))
+        desired_order = tuple(dict.fromkeys(self._passive_id(d) for d in desired))
         desired_set = set(desired_order)
 
-        # Passives each line is carrying, as the route progresses.
+        # Passives each line is carrying, as the route progresses. Both the pal
+        # and the passive references are normalised to ids here, because the
+        # route's steps are expressed in ids and a mismatch would look exactly
+        # like "no parent carries this".
         pools: dict[str, set[str]] = {
-            pal: set(passives) for pal, passives in (starting_passives or {}).items()
+            self._pal_id(pal): {self._passive_id(p) for p in passives}
+            for pal, passives in (starting_passives or {}).items()
         }
         for pal in plan.owned:
             pools.setdefault(pal, set())

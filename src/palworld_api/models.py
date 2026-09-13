@@ -48,6 +48,7 @@ class Work(StrEnum):
     COOLING = "cooling"
     TRANSPORTING = "transporting"
     FARMING = "farming"
+    OIL_EXTRACTION = "oil_extraction"
 
 
 class Stat(StrEnum):
@@ -67,6 +68,11 @@ class Stat(StrEnum):
     HUNGER_LOSS = "hunger_loss"
     CAPTURE_RATE = "capture_rate"
     ELEMENT_DAMAGE = "element_damage"
+
+
+class Gender(StrEnum):
+    MALE = "male"
+    FEMALE = "female"
 
 
 class Confidence(StrEnum):
@@ -147,6 +153,20 @@ class Passive(BaseModel):
     condition: str | None = Field(
         default=None, description="Free text, e.g. 'night' or 'hp_below_50'."
     )
+    work_bonus: dict[Work, int] = Field(
+        default_factory=dict,
+        description="Work suitability ranks added outright, not as a percentage.",
+    )
+    lottery_weight: int | None = Field(
+        default=None,
+        description="Relative chance of appearing as a random passive. 0 means it "
+        "never rolls naturally.",
+    )
+    unmapped_effects: tuple[str, ...] = Field(
+        default=(),
+        description="Effects the source declared that this schema has no stat for. "
+        "Recorded rather than dropped, so a passive never looks weaker than it is.",
+    )
     restricted_to: tuple[PalId, ...] = Field(
         default=(),
         description="If non-empty, only these pals can carry it (innate passives).",
@@ -201,8 +221,16 @@ class Pal(BaseModel):
         "(uniques reachable only via a special combo, bosses, humans).",
     )
 
+    male_probability: int | None = Field(
+        default=None,
+        ge=0,
+        le=100,
+        description="Percent chance of hatching male. A heavily skewed value makes "
+        "a pair harder to assemble, even when the route is short.",
+    )
+    rarity: int | None = Field(default=None, ge=0)
     work: dict[Work, int] = Field(
-        default_factory=dict, description="Work suitability levels, 1-5."
+        default_factory=dict, description="Work suitability levels."
     )
     stats: dict[Stat, float] = Field(
         default_factory=dict, description="Base stat values where known."
@@ -225,17 +253,38 @@ class SpecialCombo(BaseModel):
 
     Stored unordered: the engine normalises the pair before lookup so
     (a, b) and (b, a) are the same key.
+
+    `parent_genders` exists because a handful of pairs produce a different
+    child depending on which parent is which sex. Dropping that distinction
+    would silently lose one of the two children the pair can make.
     """
 
     model_config = ConfigDict(frozen=True)
 
     parents: tuple[PalId, PalId]
     child: PalId
+    parent_genders: tuple[Gender, Gender] | None = Field(
+        default=None,
+        description="Aligned with `parents`. None means the pair works either way.",
+    )
     provenance: Provenance | None = None
 
     @property
     def key(self) -> tuple[str, str]:
         return tuple(sorted(self.parents))  # type: ignore[return-value]
+
+    @property
+    def is_gendered(self) -> bool:
+        return self.parent_genders is not None
+
+    def describe_genders(self) -> str | None:
+        """Human-readable requirement, e.g. `katress must be female`."""
+        if self.parent_genders is None:
+            return None
+        return ", ".join(
+            f"{pal} must be {gender.value}"
+            for pal, gender in zip(self.parents, self.parent_genders, strict=True)
+        )
 
 
 class InheritanceConfig(BaseModel):

@@ -12,5 +12,6 @@ htmlcov/
 
 # Scraped HTML cache: large, regenerable, and not ours to redistribute.
 data/cache/
-# Generated datasets. data/demo.json is committed as a working example.
-data/pals.json
+# Generated datasets are committed: data/pals.json is the real dataset the API
+# serves, data/demo.json the synthetic one used for smoke tests. Both are
+# regenerable with the ingest CLI.

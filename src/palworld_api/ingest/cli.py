@@ -22,6 +22,7 @@ from ..dataset import DatasetError, PalIndex, load_dataset
 from ..models import Dataset
 from .base import IngestError
 from .demo import build_demo_dataset
+from .gamefiles import GameFilesSource
 from .paldb import PaldbSource
 
 DEFAULT_OUTPUT = Path("data/pals.json")
@@ -58,6 +59,35 @@ def cmd_demo(args: argparse.Namespace) -> int:
     write_dataset(dataset, args.output)
     print(f"Wrote demo dataset to {args.output}")
     print("  The pals in it are invented. Run `scrape` for real data.")
+    _report(dataset)
+    return 0
+
+
+def cmd_gamefiles(args: argparse.Namespace) -> int:
+    """Build a dataset from extracted game DataTables. The preferred source."""
+    source = GameFilesSource(
+        root=args.root, locale=args.locale, game_version=args.game_version
+    )
+    try:
+        dataset = source.fetch()
+    except IngestError as exc:
+        print(f"ingest failed: {exc}", file=sys.stderr)
+        return 1
+
+    if source.warnings:
+        print(f"{len(source.warnings)} warning(s):", file=sys.stderr)
+        for warning in source.warnings[:20]:
+            print(f"  {warning}", file=sys.stderr)
+        if len(source.warnings) > 20:
+            print(f"  ... and {len(source.warnings) - 20} more", file=sys.stderr)
+        print(
+            "  Warnings naming pals with no shipped display name are unreleased "
+            "content and are expected.",
+            file=sys.stderr,
+        )
+
+    write_dataset(dataset, args.output)
+    print(f"Wrote {args.output}")
     _report(dataset)
     return 0
 
@@ -160,6 +190,72 @@ def cmd_stats(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_crosscheck(args: argparse.Namespace) -> int:
+    """Compare a dataset against an independent extraction of the same data.
+
+    Two extractions built by different people from the same game files should
+    agree on every breeding rank. Where they do not, one of them is wrong, and
+    a route planned on the wrong one is wrong in a way nothing else here would
+    catch. Expects a directory holding `pals/*.json` and `breeding.json` in the
+    palworld-atlas-data layout.
+    """
+    try:
+        dataset = load_dataset(args.path)
+    except DatasetError as exc:
+        print(f"invalid: {exc}", file=sys.stderr)
+        return 1
+
+    reference_dir = Path(args.reference)
+    pal_files = sorted((reference_dir / "pals").glob("*.json"))
+    if not pal_files:
+        print(f"no pals/*.json under {reference_dir}", file=sys.stderr)
+        return 1
+
+    reference: dict[str, dict] = {}
+    for file in pal_files:
+        row = json.loads(file.read_text(encoding="utf-8"))
+        if isinstance(row, dict) and "name" in row:
+            reference[row["name"]] = row
+
+    mine = {p.name: p for p in dataset.pals}
+    shared = sorted(set(mine) & set(reference))
+    only_mine = sorted(set(mine) - set(reference))
+    only_reference = sorted(set(reference) - set(mine))
+
+    mismatches = [
+        (name, mine[name].combi_rank, reference[name].get("breedingRank"))
+        for name in shared
+        if mine[name].combi_rank != reference[name].get("breedingRank")
+    ]
+
+    print(f"roster: mine={len(mine)} reference={len(reference)} shared={len(shared)}")
+    for label, names in (("only in mine", only_mine), ("only in reference", only_reference)):
+        if names:
+            print(f"  {label} ({len(names)}): " + ", ".join(names[:15]))
+    print(f"breeding rank: {len(shared) - len(mismatches)}/{len(shared)} agree")
+    for name, ours, theirs in mismatches[:20]:
+        print(f"  {name}: ours={ours} reference={theirs}")
+
+    combos_file = reference_dir / "breeding.json"
+    if combos_file.exists():
+        payload = json.loads(combos_file.read_text(encoding="utf-8"))
+        theirs = {
+            (*sorted((c["parentAId"].lower(), c["parentBId"].lower())), c["childId"].lower())
+            for c in payload.get("uniquePairs", [])
+        }
+        ours = {(*sorted(c.parents), c.child) for c in dataset.special_combos}
+        unsupported = sorted(ours - theirs)
+        print(f"combos: mine={len(ours)} reference={len(theirs)} shared={len(ours & theirs)}")
+        if unsupported:
+            # Combos only we have are the dangerous direction: they would send a
+            # player down a route the reference says does not exist.
+            print(f"  not in reference ({len(unsupported)}): {unsupported[:10]}")
+
+    failed = bool(mismatches or only_mine or only_reference)
+    print("\nMISMATCH" if failed else "\nSources agree.")
+    return 1 if failed else 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="palworld-ingest", description=__doc__,
@@ -170,6 +266,19 @@ def build_parser() -> argparse.ArgumentParser:
     demo = sub.add_parser("demo", help="write the synthetic demo dataset")
     demo.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
     demo.set_defaults(func=cmd_demo)
+
+    gamefiles = sub.add_parser(
+        "gamefiles", help="build a dataset from extracted game DataTables (preferred)"
+    )
+    gamefiles.add_argument(
+        "root",
+        type=Path,
+        help="directory containing Pal/Content/... from an asset extraction",
+    )
+    gamefiles.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
+    gamefiles.add_argument("--locale", default="en")
+    gamefiles.add_argument("--game-version", default=None)
+    gamefiles.set_defaults(func=cmd_gamefiles)
 
     scrape = sub.add_parser("scrape", help="build a dataset from a community wiki")
     scrape.add_argument("--base-url", default="https://paldb.cc")
@@ -190,6 +299,15 @@ def build_parser() -> argparse.ArgumentParser:
     inspect.add_argument("--base-url", default="https://paldb.cc")
     inspect.add_argument("--cache-dir", type=Path, default=DEFAULT_CACHE)
     inspect.set_defaults(func=cmd_inspect)
+
+    crosscheck = sub.add_parser(
+        "crosscheck", help="compare a dataset against an independent extraction"
+    )
+    crosscheck.add_argument("path", type=Path, nargs="?", default=DEFAULT_OUTPUT)
+    crosscheck.add_argument(
+        "reference", type=Path, help="directory with pals/*.json and breeding.json"
+    )
+    crosscheck.set_defaults(func=cmd_crosscheck)
 
     validate = sub.add_parser("validate", help="check a dataset file")
     validate.add_argument("path", type=Path, nargs="?", default=DEFAULT_OUTPUT)

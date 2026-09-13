@@ -11,7 +11,7 @@ from bisect import bisect_left
 from functools import cached_property
 from pathlib import Path
 
-from .models import Dataset, Pal, Passive
+from .models import Dataset, Pal, Passive, SpecialCombo
 
 
 class DatasetError(RuntimeError):
@@ -32,8 +32,20 @@ class PalIndex:
         self._by_name = {p.name.casefold(): p for p in dataset.pals}
         self._by_passive_name = {p.name.casefold(): p for p in dataset.passives}
 
+        # A pair can carry more than one combo when the outcome depends on
+        # which parent is which sex, so index every combo, not just the last.
+        self.combos_by_pair: dict[tuple[str, str], tuple[SpecialCombo, ...]] = {}
+        for combo in dataset.special_combos:
+            self.combos_by_pair.setdefault(combo.key, ())
+            self.combos_by_pair[combo.key] += (combo,)
+
+        # The gender-agnostic view the formula path needs: one child per pair,
+        # preferring an ungendered combo when both kinds exist.
         self.special_combos: dict[tuple[str, str], str] = {
-            combo.key: combo.child for combo in dataset.special_combos
+            pair: next(
+                (c.child for c in combos if not c.is_gendered), combos[0].child
+            )
+            for pair, combos in self.combos_by_pair.items()
         }
 
         # Children the rank formula is allowed to land on, sorted by rank so the

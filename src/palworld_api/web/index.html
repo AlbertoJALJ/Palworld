@@ -76,6 +76,7 @@
     padding: 1px 7px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted);
   }
   .tag.special { color: var(--special); border-color: var(--special); }
+  .tag.gender { color: var(--accent); border-color: var(--accent); }
   .meta { color: var(--muted); font-size: 0.85rem; margin-bottom: 10px; }
   table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
   th, td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--line); }
@@ -195,6 +196,18 @@ async function api(path) {
   return body;
 }
 
+// The API states gender requirements in English; the UI is Spanish.
+function translateGenders(text) {
+  return text
+    .split(", ")
+    .map((clause) => {
+      const match = clause.match(/^(.*) must be (male|female)$/);
+      if (!match) return clause;
+      return `${nameOf(match[1])} ${match[2] === "male" ? "macho" : "hembra"}`;
+    })
+    .join(" + ");
+}
+
 function el(tag, className, text) {
   const node = document.createElement(tag);
   if (className) node.className = className;
@@ -223,6 +236,9 @@ async function runRoute() {
       `${nameOf(step.parent_a)} + ${nameOf(step.parent_b)} → ${nameOf(step.child)}`));
     if (step.rule === "special") row.appendChild(el("span", "tag special", "combo especial"));
     else if (step.rule === "same_species") row.appendChild(el("span", "tag", "misma especie"));
+    if (step.gender_requirement) {
+      row.appendChild(el("span", "tag gender", translateGenders(step.gender_requirement)));
+    }
     out.appendChild(row);
   }
   if (data.alternatives_for_final_step.length) {
@@ -240,6 +256,14 @@ async function runBreed() {
     `${nameOf(data.parent_a)} + ${nameOf(data.parent_b)} → ${nameOf(data.child)}`));
   if (data.rule === "special") row.appendChild(el("span", "tag special", "combo especial"));
   out.appendChild(row);
+  if (data.gender_requirement) {
+    out.appendChild(el("p", "meta", "Requiere: " + translateGenders(data.gender_requirement)));
+  }
+  if (data.alternatives && data.alternatives.length) {
+    out.appendChild(el("p", "meta",
+      "La misma pareja puede dar, con los sexos invertidos: " +
+      data.alternatives.map(nameOf).join(", ")));
+  }
   if (data.target_rank !== null && data.target_rank !== undefined) {
     out.appendChild(el("p", "meta", `Rango objetivo calculado: ${data.target_rank}`));
   }

@@ -346,7 +346,7 @@ class PaldbSource:
             if suitability is None:
                 continue
             level = first_int(values[0])
-            if level is not None and 1 <= level <= 5:
+            if level is not None and 1 <= level <= 6:
                 work[suitability] = level
         return work
 
