@@ -13,7 +13,7 @@ from __future__ import annotations
 import os
 from functools import lru_cache
 from pathlib import Path
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
 from fastapi import Depends, FastAPI, HTTPException, Query
 from fastapi.responses import FileResponse
@@ -27,11 +27,14 @@ from .inheritance import InheritanceEngine
 from .models import Element, Work
 from .passives import PROFILES, PassiveEngine, WorkRanking
 from .routes import RouteError, RoutePlanner, Strategy
+from .translations import Translations, load_translations
 
 _ENV_DATASET = os.environ.get("PALWORLD_DATASET")
 DEFAULT_DATASET = Path(_ENV_DATASET) if _ENV_DATASET else find_default_dataset()
 WEB_DIR = Path(__file__).parent / "web"
 ICONS_DIR = WEB_DIR / "icons"
+
+Lang = Literal["en", "es"]
 
 
 class Services:
@@ -49,6 +52,24 @@ class Services:
         # request: the icon set only changes when someone re-runs `cli icons`,
         # which restarts the process anyway.
         self.icon_ids = existing_icon_ids(ICONS_DIR)
+        # Same reasoning for translations: {} per locale when the sidecar file
+        # is absent, so a request for an untranslated locale just falls back
+        # to English rather than failing.
+        self.translations: dict[str, Translations] = {}
+        for locale in ("es",):
+            translation = load_translations(find_default_dataset(f"i18n/{locale}.json"))
+            if translation is not None:
+                self.translations[locale] = translation
+
+    def pal_name(self, pal_id: str, lang: Lang) -> str:
+        fallback = self.index.require(pal_id).name
+        translation = self.translations.get(lang)
+        return translation.pal_name(pal_id, fallback) if translation else fallback
+
+    def passive_name(self, passive_id: str, lang: Lang) -> str:
+        fallback = self.index.passives[passive_id].name
+        translation = self.translations.get(lang)
+        return translation.passive_name(passive_id, fallback) if translation else fallback
 
     def icon_url(self, pal_id: str) -> str | None:
         """The pal's icon URL, or None when this dataset has no icon for it.
@@ -256,7 +277,10 @@ def list_pals(
     element: Element | None = None,
     work: Work | None = None,
     breedable: bool | None = None,
-    search: str | None = Query(default=None, description="Case-insensitive name match."),
+    search: str | None = Query(
+        default=None, description="Case-insensitive match against the name in any language."
+    ),
+    lang: Lang = "en",
     limit: int = Query(default=100, ge=1, le=1000),
     offset: int = Query(default=0, ge=0),
 ) -> list[PalSummary]:
@@ -269,13 +293,18 @@ def list_pals(
         pals = [p for p in pals if p.is_breedable_child == breedable]
     if search:
         needle = search.casefold()
-        pals = [p for p in pals if needle in p.name.casefold()]
+        pals = [
+            p
+            for p in pals
+            if needle in p.name.casefold()
+            or needle in services.pal_name(p.id, lang).casefold()
+        ]
 
     window = pals[offset : offset + limit]
     return [
         PalSummary(
             id=p.id,
-            name=p.name,
+            name=services.pal_name(p.id, lang),
             paldeck=p.paldeck,
             elements=list(p.elements),
             combi_rank=p.combi_rank,
@@ -288,12 +317,14 @@ def list_pals(
 
 
 @app.get("/pals/{pal_id}", tags=["pals"])
-def get_pal(pal_id: str, services: ServicesDep) -> dict[str, Any]:
+def get_pal(pal_id: str, services: ServicesDep, lang: Lang = "en") -> dict[str, Any]:
     pal = services.index.resolve(pal_id)
     if pal is None:
         raise HTTPException(status_code=404, detail=f"unknown pal: {pal_id!r}")
+    body = pal.model_dump(mode="json", exclude_none=True)
+    body["name"] = services.pal_name(pal.id, lang)
     return {
-        "pal": pal.model_dump(mode="json", exclude_none=True),
+        "pal": body,
         "icon": services.icon_url(pal.id),
         "data_quality": _quality(services).model_dump(),
     }
@@ -442,6 +473,7 @@ def best_passives(
     pal_id: str,
     services: ServicesDep,
     goal: str = Query(default="combat", description="One of the ids from /goals."),
+    lang: Lang = "en",
 ) -> PassiveSetResponse:
     """The optimal passive loadout for a pal, for a given goal."""
     try:
@@ -458,7 +490,7 @@ def best_passives(
         passives=[
             PassiveResponse(
                 id=p.passive_id,
-                name=p.name,
+                name=services.passive_name(p.passive_id, lang),
                 score=p.score,
                 unconditional_score=p.unconditional_score,
                 condition=p.condition,

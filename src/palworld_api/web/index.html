@@ -27,8 +27,19 @@
     font: 15px/1.55 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   }
   .wrap { max-width: 960px; margin: 0 auto; }
+  .topbar {
+    display: flex; justify-content: space-between; align-items: flex-start;
+    gap: 12px; flex-wrap: wrap;
+  }
   h1 { font-size: 1.5rem; margin: 0 0 4px; letter-spacing: -0.01em; }
   .sub { color: var(--muted); margin: 0 0 20px; font-size: 0.92rem; }
+  .lang-switch { display: flex; gap: 4px; flex: 0 0 auto; }
+  .lang-btn {
+    padding: 5px 12px; border: 1px solid var(--line); background: var(--panel);
+    color: var(--muted); border-radius: 999px; cursor: pointer; font: inherit;
+    font-size: 0.8rem; font-weight: 600;
+  }
+  .lang-btn[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
   .banner {
     background: var(--warn-bg); border: 1px solid var(--warn-line); color: var(--warn-ink);
     padding: 10px 14px; border-radius: var(--radius); margin-bottom: 20px; font-size: 0.9rem;
@@ -137,22 +148,30 @@
 </head>
 <body>
 <div class="wrap">
-  <h1>Palworld Data API</h1>
-  <p class="sub">Consultas de crianza, rutas y pasivas contra la API local.</p>
+  <div class="topbar">
+    <div>
+      <h1 id="heading">Palworld Data API</h1>
+      <p class="sub" id="subtitle">Consultas de crianza, rutas y pasivas contra la API local.</p>
+    </div>
+    <div class="lang-switch" role="group" aria-label="Idioma / Language">
+      <button type="button" class="lang-btn" data-lang="es">ES</button>
+      <button type="button" class="lang-btn" data-lang="en">EN</button>
+    </div>
+  </div>
 
   <div class="banner" id="banner" hidden></div>
 
   <div class="tabs" role="tablist">
-    <button class="tab" role="tab" data-view="route" aria-selected="true">Ruta</button>
-    <button class="tab" role="tab" data-view="breed" aria-selected="false">Cruce</button>
-    <button class="tab" role="tab" data-view="passives" aria-selected="false">Pasivas</button>
-    <button class="tab" role="tab" data-view="parents" aria-selected="false">Progenitores</button>
-    <button class="tab" role="tab" data-view="work" aria-selected="false">Trabajo</button>
+    <button class="tab" role="tab" data-view="route" aria-selected="true"></button>
+    <button class="tab" role="tab" data-view="breed" aria-selected="false"></button>
+    <button class="tab" role="tab" data-view="passives" aria-selected="false"></button>
+    <button class="tab" role="tab" data-view="parents" aria-selected="false"></button>
+    <button class="tab" role="tab" data-view="work" aria-selected="false"></button>
   </div>
 
   <div class="panel">
     <div class="row" id="controls"></div>
-    <div class="out" id="out"><p class="empty">Elige una consulta y pulsa el botón.</p></div>
+    <div class="out" id="out"></div>
   </div>
 </div>
 
@@ -165,63 +184,142 @@ let pals = [];
 // instead of every picker registering (and leaking) its own.
 let activePicker = null;
 
-// Labels for the game's base-work suitabilities. The API returns the raw
-// enum value (e.g. "watering"); these are only for display.
-const WORK_LABELS = {
-  watering: "Riego",
-  planting: "Siembra",
-  lumbering: "Tala",
-  mining: "Minería",
-  kindling: "Encendido",
-  generating_electricity: "Generación eléctrica",
-  handiwork: "Manualidades",
-  gathering: "Recolección",
-  medicine_production: "Producción medicinal",
-  cooling: "Enfriamiento",
-  transporting: "Transporte",
-  farming: "Granja",
-  oil_extraction: "Extracción de petróleo",
+// Every user-facing string, in both languages this UI supports. Passive and
+// pal names come from the API's own `lang` query param instead (see `api()`
+// and `PALS_URL`), since those are game data with their own translation
+// coverage, not fixed UI chrome.
+const I18N = {
+  es: {
+    heading: "Palworld Data API",
+    subtitle: "Consultas de crianza, rutas y pasivas contra la API local.",
+    tabs: { route: "Ruta", breed: "Cruce", passives: "Pasivas", parents: "Progenitores", work: "Trabajo" },
+    target: "Objetivo", owned: "Pals que tienes (coma)", ownedPlaceholder: "vacío = todos los capturables",
+    strategy: "Estrategia", generations: "Generaciones", tree: "Árbol",
+    parentA: "Progenitor A", parentB: "Progenitor B",
+    pal: "Pal", goal: "Uso", combat: "Combate", base: "Base",
+    activity: "Actividad", allSummary: "Todas (resumen)",
+    consult: "Consultar",
+    searchPalPlaceholder: "Buscar pal…", searchPalLabel: "Buscar pal",
+    noResults: "Sin resultados.", noPalsAvailable: "Sin pals disponibles",
+    chooseAndRun: "Elige una consulta y pulsa el botón.",
+    specialCombo: "combo especial", sameSpecies: "misma especie",
+    genderMale: "macho", genderFemale: "hembra",
+    alreadyOwned: "Ya lo tienes: no hace falta criar nada.",
+    routeSummary: (g, s) => `${g} generación(es), ${s} cruce(s) distintos.`,
+    routeAlternatives: "Alternativas para el último paso: ",
+    breedRequires: "Requiere: ",
+    breedAlternatives: "La misma pareja puede dar, con los sexos invertidos: ",
+    breedTargetRank: (r) => `Rango objetivo calculado: ${r}`,
+    noUsefulPassives: "Ninguna pasiva aporta nada para este objetivo.",
+    passivesScore: (s, c) => `Puntuación total ${s} sobre ${c} pasivas evaluadas.`,
+    thPassive: "Pasiva", thCondition: "Condición", thPoints: "Puntos", none: "—",
+    noParents: "Ninguna pareja produce este pal.",
+    parentsCount: (n) => `${n} pareja(s) lo producen.`,
+    andMore: (n) => `… y ${n} más.`,
+    noWorkData: "Este dataset no trae aptitudes de trabajo.",
+    thActivity: "Actividad", thBestPals: "Mejores pals",
+    noPalsForActivity: "Ningún pal tiene esta aptitud en este dataset.",
+    bestPalsFor: (label) => `Mejores pals para ${label}:`,
+    thPal: "Pal", thLevel: "Nivel",
+    work: {
+      watering: "Riego", planting: "Siembra", lumbering: "Tala", mining: "Minería",
+      kindling: "Encendido", generating_electricity: "Generación eléctrica",
+      handiwork: "Manualidades", gathering: "Recolección",
+      medicine_production: "Producción medicinal", cooling: "Enfriamiento",
+      transporting: "Transporte", farming: "Granja", oil_extraction: "Extracción de petróleo",
+    },
+  },
+  en: {
+    heading: "Palworld Data API",
+    subtitle: "Breeding, route and passive queries against the local API.",
+    tabs: { route: "Route", breed: "Breed", passives: "Passives", parents: "Parents", work: "Work" },
+    target: "Target", owned: "Pals you own (comma)", ownedPlaceholder: "empty = everything catchable",
+    strategy: "Strategy", generations: "Generations", tree: "Tree",
+    parentA: "Parent A", parentB: "Parent B",
+    pal: "Pal", goal: "Use", combat: "Combat", base: "Base",
+    activity: "Activity", allSummary: "All (summary)",
+    consult: "Query",
+    searchPalPlaceholder: "Search pal…", searchPalLabel: "Search pal",
+    noResults: "No results.", noPalsAvailable: "No pals available",
+    chooseAndRun: "Pick a query and press the button.",
+    specialCombo: "special combo", sameSpecies: "same species",
+    genderMale: "male", genderFemale: "female",
+    alreadyOwned: "You already have it: no breeding needed.",
+    routeSummary: (g, s) => `${g} generation(s), ${s} distinct cross(es).`,
+    routeAlternatives: "Alternatives for the final step: ",
+    breedRequires: "Requires: ",
+    breedAlternatives: "The same pair can also give, with sexes swapped: ",
+    breedTargetRank: (r) => `Computed target rank: ${r}`,
+    noUsefulPassives: "No passive helps for this goal.",
+    passivesScore: (s, c) => `Total score ${s} out of ${c} passives considered.`,
+    thPassive: "Passive", thCondition: "Condition", thPoints: "Points", none: "—",
+    noParents: "No pair produces this pal.",
+    parentsCount: (n) => `${n} pair(s) produce it.`,
+    andMore: (n) => `… and ${n} more.`,
+    noWorkData: "This dataset has no work suitabilities.",
+    thActivity: "Activity", thBestPals: "Best pals",
+    noPalsForActivity: "No pal has this suitability in this dataset.",
+    bestPalsFor: (label) => `Best pals for ${label}:`,
+    thPal: "Pal", thLevel: "Level",
+    work: {
+      watering: "Watering", planting: "Planting", lumbering: "Lumbering", mining: "Mining",
+      kindling: "Kindling", generating_electricity: "Generating Electricity",
+      handiwork: "Handiwork", gathering: "Gathering",
+      medicine_production: "Medicine Production", cooling: "Cooling",
+      transporting: "Transporting", farming: "Farming", oil_extraction: "Oil Extraction",
+    },
+  },
 };
 
-const VIEWS = {
-  route: {
-    fields: [
-      { id: "target", label: "Objetivo", type: "pal" },
-      { id: "owned", label: "Pals que tienes (coma)", type: "text", placeholder: "vacío = todos los capturables" },
-      { id: "strategy", label: "Estrategia", type: "select", options: [["generations", "Generaciones"], ["tree", "Árbol"]] },
-    ],
-    run: runRoute,
-  },
-  breed: {
-    fields: [
-      { id: "parent_a", label: "Progenitor A", type: "pal" },
-      { id: "parent_b", label: "Progenitor B", type: "pal" },
-    ],
-    run: runBreed,
-  },
-  passives: {
-    fields: [
-      { id: "pal", label: "Pal", type: "pal" },
-      { id: "goal", label: "Uso", type: "select", options: [["combat", "Combate"], ["base", "Base"]] },
-    ],
-    run: runPassives,
-  },
-  parents: {
-    fields: [{ id: "pal", label: "Pal", type: "pal" }],
-    run: runParents,
-  },
-  work: {
-    fields: [
-      {
-        id: "activity",
-        label: "Actividad",
-        type: "select",
-        options: [["", "Todas (resumen)"], ...Object.entries(WORK_LABELS)],
-      },
-    ],
-    run: runWork,
-  },
-};
+let LANG = "es";
+try {
+  LANG = localStorage.getItem("palworld_lang") || "es";
+} catch {
+  // Private browsing or blocked storage: fall back to the default silently.
+}
+const t = (key) => I18N[LANG][key];
+
+function buildViews() {
+  return {
+    route: {
+      fields: [
+        { id: "target", label: t("target"), type: "pal" },
+        { id: "owned", label: t("owned"), type: "text", placeholder: t("ownedPlaceholder") },
+        { id: "strategy", label: t("strategy"), type: "select", options: [["generations", t("generations")], ["tree", t("tree")]] },
+      ],
+      run: runRoute,
+    },
+    breed: {
+      fields: [
+        { id: "parent_a", label: t("parentA"), type: "pal" },
+        { id: "parent_b", label: t("parentB"), type: "pal" },
+      ],
+      run: runBreed,
+    },
+    passives: {
+      fields: [
+        { id: "pal", label: t("pal"), type: "pal" },
+        { id: "goal", label: t("goal"), type: "select", options: [["combat", t("combat")], ["base", t("base")]] },
+      ],
+      run: runPassives,
+    },
+    parents: {
+      fields: [{ id: "pal", label: t("pal"), type: "pal" }],
+      run: runParents,
+    },
+    work: {
+      fields: [
+        {
+          id: "activity",
+          label: t("activity"),
+          type: "select",
+          options: [["", t("allSummary")], ...Object.entries(t("work"))],
+        },
+      ],
+      run: runWork,
+    },
+  };
+}
 
 // Rough color per element, used only for the placeholder badge a pal gets
 // when it has no real icon on disk yet. Not game data -- just a visual hint.
@@ -281,8 +379,8 @@ function createPalPicker(wrap, fieldId) {
   const search = document.createElement("input");
   search.type = "text";
   search.className = "picker-search";
-  search.placeholder = "Buscar pal…";
-  search.setAttribute("aria-label", "Buscar pal");
+  search.placeholder = t("searchPalPlaceholder");
+  search.setAttribute("aria-label", t("searchPalLabel"));
   const list = el("div", "picker-list");
   list.setAttribute("role", "listbox");
   panel.appendChild(search);
@@ -291,7 +389,7 @@ function createPalPicker(wrap, fieldId) {
   function showButton(pal) {
     button.innerHTML = "";
     button.appendChild(palIcon(pal));
-    button.appendChild(el("span", "name", pal ? pal.name : "Sin pals disponibles"));
+    button.appendChild(el("span", "name", pal ? pal.name : t("noPalsAvailable")));
     button.appendChild(el("span", "caret", "▾"));
   }
 
@@ -314,7 +412,7 @@ function createPalPicker(wrap, fieldId) {
       ? pals.filter((p) => p.name.toLowerCase().includes(needle))
       : pals;
     if (!matches.length) {
-      list.appendChild(el("div", "picker-empty", "Sin resultados."));
+      list.appendChild(el("div", "picker-empty", t("noResults")));
       return;
     }
     for (const pal of matches.slice(0, 300)) {
@@ -366,10 +464,30 @@ document.addEventListener("click", (event) => {
   }
 });
 
+let currentView = "route";
+
+// Redraws everything the current language touches: tab labels, the field
+// panel for whichever tab is open, and the page heading -- everything that
+// isn't game data fetched with its own `lang` param.
+function applyLanguage() {
+  document.documentElement.lang = LANG;
+  for (const btn of document.querySelectorAll(".lang-btn")) {
+    btn.setAttribute("aria-pressed", String(btn.dataset.lang === LANG));
+  }
+  document.getElementById("heading").textContent = t("heading");
+  document.getElementById("subtitle").textContent = t("subtitle");
+  for (const tab of document.querySelectorAll(".tab")) {
+    tab.textContent = t("tabs")[tab.dataset.view];
+  }
+  render(currentView);
+}
+
 function render(view) {
+  currentView = view;
+  const views = buildViews();
   controls.innerHTML = "";
   activePicker = null; // its DOM is about to be wiped along with `controls`
-  for (const field of VIEWS[view].fields) {
+  for (const field of views[view].fields) {
     const wrap = document.createElement("div");
     wrap.className = "field";
     const label = document.createElement("label");
@@ -400,11 +518,12 @@ function render(view) {
   holder.className = "field";
   holder.style.flex = "0 0 auto";
   const button = document.createElement("button");
-  button.textContent = "Consultar";
-  button.onclick = () => VIEWS[view].run().catch(showError);
+  button.textContent = t("consult");
+  button.onclick = () => views[view].run().catch(showError);
   holder.appendChild(button);
   controls.appendChild(holder);
-  out.innerHTML = '<p class="empty">Elige una consulta y pulsa el botón.</p>';
+  out.innerHTML = "";
+  out.appendChild(el("p", "empty", t("chooseAndRun")));
 }
 
 const value = (id) => document.getElementById("f_" + id).value.trim();
@@ -419,20 +538,24 @@ function showError(error) {
 }
 
 async function api(path) {
-  const response = await fetch(path);
+  const url = path + (path.includes("?") ? "&" : "?") + `lang=${LANG}`;
+  const response = await fetch(url);
   const body = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(body.detail || `HTTP ${response.status}`);
   return body;
 }
 
-// The API states gender requirements in English; the UI is Spanish.
+// The API states gender requirements in English regardless of `lang` (it's a
+// fixed two-word grammar, "X must be male/female", not free text); translate
+// the two words here instead of asking the backend to localise a sentence
+// shape the UI already knows how to rebuild.
 function translateGenders(text) {
   return text
     .split(", ")
     .map((clause) => {
       const match = clause.match(/^(.*) must be (male|female)$/);
       if (!match) return clause;
-      return `${nameOf(match[1])} ${match[2] === "male" ? "macho" : "hembra"}`;
+      return `${nameOf(match[1])} ${match[2] === "male" ? t("genderMale") : t("genderFemale")}`;
     })
     .join(" + ");
 }
@@ -453,24 +576,23 @@ async function runRoute() {
 
   out.innerHTML = "";
   if (data.already_owned) {
-    out.appendChild(el("p", "empty", "Ya lo tienes: no hace falta criar nada."));
+    out.appendChild(el("p", "empty", t("alreadyOwned")));
     return;
   }
-  out.appendChild(el("p", "meta",
-    `${data.generations} generación(es), ${data.distinct_steps} cruce(s) distintos.`));
+  out.appendChild(el("p", "meta", t("routeSummary")(data.generations, data.distinct_steps)));
   for (const step of data.steps) {
     const row = el("div", "step");
     row.appendChild(el("span", "gen", "G" + step.generation));
     row.appendChild(formula([step.parent_a, step.parent_b, step.child], [" + ", " → "]));
-    if (step.rule === "special") row.appendChild(el("span", "tag special", "combo especial"));
-    else if (step.rule === "same_species") row.appendChild(el("span", "tag", "misma especie"));
+    if (step.rule === "special") row.appendChild(el("span", "tag special", t("specialCombo")));
+    else if (step.rule === "same_species") row.appendChild(el("span", "tag", t("sameSpecies")));
     if (step.gender_requirement) {
       row.appendChild(el("span", "tag gender", translateGenders(step.gender_requirement)));
     }
     out.appendChild(row);
   }
   if (data.alternatives_for_final_step.length) {
-    out.appendChild(el("p", "meta", "Alternativas para el último paso: " +
+    out.appendChild(el("p", "meta", t("routeAlternatives") +
       data.alternatives_for_final_step.map((p) => `${nameOf(p[0])} + ${nameOf(p[1])}`).join(" · ")));
   }
 }
@@ -481,18 +603,17 @@ async function runBreed() {
   out.innerHTML = "";
   const row = el("div", "step");
   row.appendChild(formula([data.parent_a, data.parent_b, data.child], [" + ", " → "]));
-  if (data.rule === "special") row.appendChild(el("span", "tag special", "combo especial"));
+  if (data.rule === "special") row.appendChild(el("span", "tag special", t("specialCombo")));
   out.appendChild(row);
   if (data.gender_requirement) {
-    out.appendChild(el("p", "meta", "Requiere: " + translateGenders(data.gender_requirement)));
+    out.appendChild(el("p", "meta", t("breedRequires") + translateGenders(data.gender_requirement)));
   }
   if (data.alternatives && data.alternatives.length) {
     out.appendChild(el("p", "meta",
-      "La misma pareja puede dar, con los sexos invertidos: " +
-      data.alternatives.map(nameOf).join(", ")));
+      t("breedAlternatives") + data.alternatives.map(nameOf).join(", ")));
   }
   if (data.target_rank !== null && data.target_rank !== undefined) {
-    out.appendChild(el("p", "meta", `Rango objetivo calculado: ${data.target_rank}`));
+    out.appendChild(el("p", "meta", t("breedTargetRank")(data.target_rank)));
   }
 }
 
@@ -501,19 +622,18 @@ async function runPassives() {
     `/pals/${encodeURIComponent(value("pal"))}/passives?goal=${encodeURIComponent(value("goal"))}`);
   out.innerHTML = "";
   if (!data.passives.length) {
-    out.appendChild(el("p", "empty", "Ninguna pasiva aporta nada para este objetivo."));
+    out.appendChild(el("p", "empty", t("noUsefulPassives")));
     return;
   }
-  out.appendChild(el("p", "meta",
-    `Puntuación total ${data.total_score} sobre ${data.considered} pasivas evaluadas.`));
+  out.appendChild(el("p", "meta", t("passivesScore")(data.total_score, data.considered)));
   const scroll = el("div", "scroll");
   const table = el("table");
-  table.innerHTML = "<thead><tr><th>Pasiva</th><th>Condición</th><th class='num'>Puntos</th></tr></thead>";
+  table.innerHTML = `<thead><tr><th>${t("thPassive")}</th><th>${t("thCondition")}</th><th class='num'>${t("thPoints")}</th></tr></thead>`;
   const body = el("tbody");
   for (const passive of data.passives) {
     const tr = el("tr");
     tr.appendChild(el("td", null, passive.name));
-    tr.appendChild(el("td", null, passive.condition || "—"));
+    tr.appendChild(el("td", null, passive.condition || t("none")));
     tr.appendChild(el("td", "num", String(passive.score)));
     body.appendChild(tr);
   }
@@ -526,16 +646,16 @@ async function runParents() {
   const data = await api(`/pals/${encodeURIComponent(value("pal"))}/parents`);
   out.innerHTML = "";
   if (!data.count) {
-    out.appendChild(el("p", "empty", "Ninguna pareja produce este pal."));
+    out.appendChild(el("p", "empty", t("noParents")));
     return;
   }
-  out.appendChild(el("p", "meta", `${data.count} pareja(s) lo producen.`));
+  out.appendChild(el("p", "meta", t("parentsCount")(data.count)));
   for (const pair of data.pairs.slice(0, 60)) {
     const row = el("div", "step");
     row.appendChild(formula(pair, [" + "]));
     out.appendChild(row);
   }
-  if (data.count > 60) out.appendChild(el("p", "meta", `… y ${data.count - 60} más.`));
+  if (data.count > 60) out.appendChild(el("p", "meta", t("andMore")(data.count - 60)));
 }
 
 function workTable(headers) {
@@ -558,13 +678,13 @@ async function runWork() {
     const data = await api("/work?limit=5");
     const activities = Object.keys(data.by_work);
     if (!activities.length) {
-      out.appendChild(el("p", "empty", "Este dataset no trae aptitudes de trabajo."));
+      out.appendChild(el("p", "empty", t("noWorkData")));
       return;
     }
-    const { scroll, body } = workTable(["Actividad", "Mejores pals"]);
+    const { scroll, body } = workTable([t("thActivity"), t("thBestPals")]);
     for (const work of activities) {
       const tr = el("tr");
-      tr.appendChild(el("td", null, WORK_LABELS[work] || work));
+      tr.appendChild(el("td", null, t("work")[work] || work));
       const cell = el("td", "chip-list");
       for (const entry of data.by_work[work]) {
         const chip = el("span", "chip");
@@ -581,12 +701,11 @@ async function runWork() {
 
   const data = await api(`/work/${encodeURIComponent(activity)}/best?limit=15`);
   if (!data.pals.length) {
-    out.appendChild(el("p", "empty", "Ningún pal tiene esta aptitud en este dataset."));
+    out.appendChild(el("p", "empty", t("noPalsForActivity")));
     return;
   }
-  out.appendChild(el("p", "meta",
-    `Mejores pals para ${WORK_LABELS[data.work] || data.work}:`));
-  const { scroll, body } = workTable(["Pal", "Nivel"]);
+  out.appendChild(el("p", "meta", t("bestPalsFor")(t("work")[data.work] || data.work)));
+  const { scroll, body } = workTable([t("thPal"), t("thLevel")]);
   for (const p of data.pals) {
     const tr = el("tr");
     const cell = el("td");
@@ -610,8 +729,32 @@ for (const tab of document.querySelectorAll(".tab")) {
   };
 }
 
+async function loadPals() {
+  pals = await api("/pals?limit=1000");
+  pals.sort((a, b) => a.name.localeCompare(b.name));
+}
+
+for (const btn of document.querySelectorAll(".lang-btn")) {
+  btn.onclick = async () => {
+    if (btn.dataset.lang === LANG) return;
+    LANG = btn.dataset.lang;
+    try {
+      localStorage.setItem("palworld_lang", LANG);
+    } catch {
+      // Private browsing or blocked storage: the choice just won't persist.
+    }
+    try {
+      await loadPals(); // pal/passive names come from the API's own `lang`
+      applyLanguage();
+    } catch (error) {
+      showError(error);
+    }
+  };
+}
+
 (async function init() {
   try {
+    applyLanguage(); // paints static text immediately, before any network call
     const health = await api("/health");
     const warning = health.data_quality && health.data_quality.warning;
     if (warning) {
@@ -619,8 +762,7 @@ for (const tab of document.querySelectorAll(".tab")) {
       banner.textContent = warning;
       banner.hidden = false;
     }
-    pals = await api("/pals?limit=1000");
-    pals.sort((a, b) => a.name.localeCompare(b.name));
+    await loadPals();
     render("route");
   } catch (error) {
     showError(error);

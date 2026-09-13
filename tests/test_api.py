@@ -7,14 +7,38 @@ the data-quality contract rather than on particular pals.
 from __future__ import annotations
 
 import json
+from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
 
 from palworld_api import api as api_module
-from palworld_api.api import app, get_services
+from palworld_api.api import Services, app, get_services
 from palworld_api.ingest.demo import build_demo_dataset
+
+
+@contextmanager
+def override_services(services: Services) -> Iterator[None]:
+    """Temporarily point `get_services` at `services`, then put back whatever
+    override (if any) was there before.
+
+    `app.dependency_overrides` is one dict shared by the whole app, so a test
+    that blindly `.clear()`s it on the way out also erases the module-scoped
+    `client` fixture's own override -- silently falling through to the real,
+    on-disk dataset for every test that runs afterward. This restores instead
+    of clearing, so an ad-hoc override never outlives the test that set it.
+    """
+    previous = app.dependency_overrides.get(get_services)
+    app.dependency_overrides[get_services] = lambda: services
+    try:
+        yield
+    finally:
+        if previous is None:
+            app.dependency_overrides.pop(get_services, None)
+        else:
+            app.dependency_overrides[get_services] = previous
 
 
 @pytest.fixture(scope="module")
@@ -276,13 +300,80 @@ def test_pal_detail_reports_icon_as_none_when_missing(client: TestClient) -> Non
 def test_pal_summary_reports_an_icon_url_when_one_exists(dataset_path: Path) -> None:
     services = api_module.Services(dataset_path)
     services.icon_ids = frozenset({"demo_forge"})
-    app.dependency_overrides[get_services] = lambda: services
-    try:
-        with TestClient(app) as test_client:
-            body = test_client.get("/pals/demo_forge").json()
-            assert body["icon"] == "/ui/icons/demo_forge.png"
+    with override_services(services), TestClient(app) as test_client:
+        body = test_client.get("/pals/demo_forge").json()
+        assert body["icon"] == "/ui/icons/demo_forge.png"
 
-            summaries = test_client.get("/pals?search=forge").json()
-            assert summaries[0]["icon"] == "/ui/icons/demo_forge.png"
-    finally:
-        app.dependency_overrides.clear()
+        summaries = test_client.get("/pals?search=forge").json()
+        assert summaries[0]["icon"] == "/ui/icons/demo_forge.png"
+
+
+@pytest.fixture
+def translated_client(dataset_path: Path):
+    from palworld_api.translations import Translations
+
+    services = api_module.Services(dataset_path)
+    services.translations["es"] = Translations(
+        locale="es",
+        pals={"demo_wooly": "Demo Lanoso"},
+        passives={"demo_ferocious": "Demo Feroz"},
+    )
+    with override_services(services), TestClient(app) as test_client:
+        yield test_client
+
+
+def test_lang_defaults_to_english(client: TestClient) -> None:
+    body = client.get("/pals?search=Demo%20Wooly").json()
+    assert body[0]["name"] == "Demo Wooly"
+
+
+def test_unknown_locale_falls_back_to_english_when_no_file_loaded(client: TestClient) -> None:
+    # The demo dataset ships with no data/i18n/es.json entry for its own ids,
+    # so lang=es must degrade to English rather than error.
+    body = client.get("/pals?search=Demo%20Wooly&lang=es").json()
+    assert body[0]["name"] == "Demo Wooly"
+
+
+def test_lang_es_translates_a_pal_name_when_available(translated_client: TestClient) -> None:
+    body = translated_client.get("/pals?search=Demo%20Wooly&lang=es").json()
+    assert body[0]["name"] == "Demo Lanoso"
+
+
+def test_lang_en_keeps_the_english_name_even_when_a_translation_exists(
+    translated_client: TestClient,
+) -> None:
+    body = translated_client.get("/pals?lang=en&search=Demo%20Wooly").json()
+    assert body[0]["name"] == "Demo Wooly"
+
+
+def test_pal_detail_respects_lang(translated_client: TestClient) -> None:
+    body = translated_client.get("/pals/demo_wooly?lang=es").json()
+    assert body["pal"]["name"] == "Demo Lanoso"
+
+
+def test_search_matches_the_translated_name_too(translated_client: TestClient) -> None:
+    body = translated_client.get("/pals?search=Lanoso&lang=es").json()
+    assert body and body[0]["id"] == "demo_wooly"
+
+
+def test_search_by_translated_name_does_not_match_under_other_lang(
+    translated_client: TestClient,
+) -> None:
+    body = translated_client.get("/pals?search=Lanoso&lang=en").json()
+    assert body == []
+
+
+def test_passive_name_is_translated(translated_client: TestClient) -> None:
+    body = translated_client.get("/pals/demo_forge/passives?goal=combat&lang=es").json()
+    names = {p["id"]: p["name"] for p in body["passives"]}
+    assert names.get("demo_ferocious") == "Demo Feroz"
+
+
+def test_passive_name_stays_english_without_translation(client: TestClient) -> None:
+    body = client.get("/pals/demo_forge/passives?goal=combat&lang=es").json()
+    names = {p["id"]: p["name"] for p in body["passives"]}
+    assert names.get("demo_ferocious") == "Demo Ferocious"
+
+
+def test_invalid_lang_is_422(client: TestClient) -> None:
+    assert client.get("/pals?lang=fr").status_code == 422

@@ -23,6 +23,7 @@ from ..models import Dataset
 from .base import IngestError
 from .demo import build_demo_dataset
 from .gamefiles import GameFilesSource
+from .i18n import PalworldGGSource
 from .icons import sync_icons
 from .paldb import PaldbSource
 
@@ -116,6 +117,48 @@ def cmd_icons(args: argparse.Namespace) -> int:
         preview = ", ".join(report.missing[:20])
         suffix = " ..." if len(report.missing) > 20 else ""
         print(f"    {preview}{suffix}")
+    return 0
+
+
+def cmd_i18n(args: argparse.Namespace) -> int:
+    """Rebuild a locale's translations from palworld.gg. Needs Playwright."""
+    try:
+        dataset = load_dataset(args.dataset)
+    except DatasetError as exc:
+        print(f"invalid dataset: {exc}", file=sys.stderr)
+        return 1
+
+    source = PalworldGGSource(locale=args.locale)
+    try:
+        result = source.fetch(
+            [p.model_dump(mode="json") for p in dataset.pals],
+            [p.model_dump(mode="json") for p in dataset.passives],
+        )
+    except IngestError as exc:
+        print(f"i18n fetch failed: {exc}", file=sys.stderr)
+        return 1
+
+    if source.warnings:
+        print(f"{len(source.warnings)} warning(s):", file=sys.stderr)
+        for warning in source.warnings:
+            print(f"  {warning}", file=sys.stderr)
+
+    payload = {
+        "locale": result["locale"],
+        "retrieved_at": result["retrieved_at"],
+        "sources": [
+            {"kind": "pal_names", "url": f"{source.base_url}/{args.locale}/pals"},
+            {"kind": "passive_names", "url": f"{source.base_url}/{args.locale}/passive-skills"},
+        ],
+        "pals": result["pals"],
+        "passives": result["passives"],
+    }
+    output = args.output or Path("data/i18n") / f"{args.locale}.json"
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_text(json.dumps(payload, indent=1, ensure_ascii=False), encoding="utf-8")
+    print(f"Wrote {output}")
+    print(f"  pals translated:     {len(result['pals'])}/{len(dataset.pals)}")
+    print(f"  passives translated: {len(result['passives'])}/{len(dataset.passives)}")
     return 0
 
 
@@ -318,6 +361,14 @@ def build_parser() -> argparse.ArgumentParser:
     icons.add_argument("--output", type=Path, default=DEFAULT_ICONS_DIR)
     icons.add_argument("--dataset", type=Path, default=DEFAULT_OUTPUT)
     icons.set_defaults(func=cmd_icons)
+
+    i18n = sub.add_parser(
+        "i18n", help="rebuild a locale's pal/passive name translations (needs Playwright)"
+    )
+    i18n.add_argument("--locale", default="es")
+    i18n.add_argument("--dataset", type=Path, default=DEFAULT_OUTPUT)
+    i18n.add_argument("--output", type=Path, default=None)
+    i18n.set_defaults(func=cmd_i18n)
 
     scrape = sub.add_parser("scrape", help="build a dataset from a community wiki")
     scrape.add_argument("--base-url", default="https://paldb.cc")

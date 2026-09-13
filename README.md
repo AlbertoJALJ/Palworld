@@ -91,6 +91,63 @@ never guessed at).
 > them. `src/palworld_api/web/icons/*.png` is regenerable from any extraction
 > in one command, so removing it costs nothing but re-running `icons`.
 
+## Language (Spanish / English)
+
+The web UI has an ES/EN toggle (top right), and every endpoint that returns a
+name accepts `?lang=es` or `?lang=en` (default `en`). Two different things
+get localised, from two different places:
+
+- **UI chrome** — tab labels, field labels, button and status text — is
+  translated directly in the frontend (`I18N` in `web/index.html`), the same
+  hand-written way the rest of the page always was.
+- **Game data names** — pals and passives — come from a translation sidecar,
+  `data/i18n/es.json`, loaded once at startup and merged in by
+  `Services.pal_name()` / `.passive_name()`. Missing this file, or missing a
+  specific id in it, is not an error: the API falls back to the English name,
+  the same "a gap is reported, never guessed at" rule as everywhere else in
+  this project — the difference here is that the *reasonable* fallback is
+  showing English, not refusing to answer.
+
+**Finding worth knowing before you go looking for more:** Palworld does not
+translate species names at all — Anubis, Lamball, Katress are the same word
+in every one of the game's shipped languages, the same convention Pokémon
+uses. All 288/288 pals were checked against this project's own roster and
+not one differs from its English name. `data/i18n/es.json`'s `pals` section
+exists mainly to document that finding, not because a real translation was
+needed.
+
+Passive names are a different story — "Legend" really is "Leyenda" — and
+there is no shared internal id to join on the way pal icons and pal names
+both do. `ingest/i18n.py` instead parses each Spanish passive card's
+rendered description back into an effect signature (stat + value) and
+matches it against this project's own `Passive.effects`. **67 of 282**
+passives matched a signature unique to one English name; where the exact
+same numbers are shared by more than one passive (a generic tiered skill and
+a flavour-named one worth the same amount, say) the match is genuinely
+ambiguous and is left in English rather than guessed — 8 such cases exist
+today.
+
+```bash
+python -m palworld_api.ingest.cli i18n --locale es --dataset data/pals.json
+```
+
+Regenerating needs Playwright (`pip install playwright && playwright install
+chromium`): the source, `palworld.gg`, paginates its passive-skill catalog
+client-side with no separate URL per page, so a plain HTTP fetch cannot see
+past the first batch. `robots.txt` there disallows nothing; the fetch is
+still rate-limited and identifies itself, same as `paldb.py`.
+
+`data/i18n/es.json` carries its own `retrieved_at` timestamp so its freshness
+never has to be taken on faith. The committed file was pulled live from the
+current site (World Tree content included, the same build `data/pals.json`
+itself was extracted from) — re-run the command above after a patch rather
+than trusting an old copy.
+
+> **Licensing.** Same shape of note as the dataset and the icons: this is a
+> community site's own rendering of the game's names and numbers, not
+> Pocketpair's files directly. `data/i18n/es.json` is regenerable in one
+> command, so it can be dropped from the repo without losing anything else.
+
 ## Quick start
 
 ```bash
@@ -210,15 +267,15 @@ expected number of eggs, and the eggs needed for 90% confidence.
 | Endpoint | What it answers |
 |---|---|
 | `GET /health` | Dataset contents and data quality |
-| `GET /pals` | List/filter by element, work, breedability, name |
-| `GET /pals/{id}` | Full record |
+| `GET /pals` | List/filter by element, work, breedability, name (`lang=es\|en`) |
+| `GET /pals/{id}` | Full record (`lang=es\|en`) |
 | `GET /breed?parent_a=&parent_b=` | What one pair produces, by which rule, and any sex requirement |
 | `GET /pals/{id}/parents` | Every pair that produces this pal |
 | `GET /pals/{id}/children` | What this pal produces with every partner |
 | `GET /routes/{target}` | Cheapest route, plus alternatives for the final step |
 | `GET /reachable` | Everything reachable from a starting set |
 | `GET /goals` | The built-in passive goals and their weights |
-| `GET /pals/{id}/passives?goal=` | Optimal loadout for base or combat |
+| `GET /pals/{id}/passives?goal=` | Optimal loadout for base or combat (`lang=es\|en`) |
 | `GET /work` | The best pals for every base activity (watering, mining, ...) |
 | `GET /work/{work}/best` | The best pals for one specific activity |
 | `POST /routes/plan` | A route costed out for the passives you want |
@@ -257,13 +314,15 @@ src/palworld_api/
   passives.py     Scoring and provably-optimal loadout selection
   inheritance.py  Exact inheritance odds, and eggs-per-step
   api.py          FastAPI surface
+  translations.py Loads the i18n sidecar file at startup; English if absent
   web/            The UI the API serves at /
   ingest/
     gamefiles.py  The game's own DataTables. The real source.
     icons.py      Pal icon textures, matched by the same tribe id
+    i18n.py       Spanish names, matched by id (pals) or effect (passives)
     paldb.py      Community-wiki scraper. Fallback, selectors unvalidated.
     demo.py       Synthetic pals, for smoke tests
-    cli.py        Build, validate, cross-check, sync icons
+    cli.py        Build, validate, cross-check, sync icons, sync i18n
 ```
 
 The dependency runs one way: nothing in `ingest/` is imported by the engine, so
@@ -291,7 +350,7 @@ were never measured.
 ## Development
 
 ```bash
-python -m pytest        # 168 tests
+python -m pytest        # 208 tests
 python -m ruff check src tests
 ```
 

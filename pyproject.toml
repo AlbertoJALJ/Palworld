@@ -19,6 +19,9 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0", "ruff>=0.4"]
+# Only needed to regenerate data/i18n/*.json (`cli i18n`); the API and web UI
+# never import this.
+i18n = ["playwright>=1.40"]
 
 [project.scripts]
 palworld-ingest = "palworld_api.ingest.cli:main"
