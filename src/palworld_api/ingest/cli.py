@@ -23,10 +23,12 @@ from ..models import Dataset
 from .base import IngestError
 from .demo import build_demo_dataset
 from .gamefiles import GameFilesSource
+from .icons import sync_icons
 from .paldb import PaldbSource
 
 DEFAULT_OUTPUT = Path("data/pals.json")
 DEFAULT_CACHE = Path("data/cache")
+DEFAULT_ICONS_DIR = Path(__file__).resolve().parents[1] / "web" / "icons"
 
 
 def write_dataset(dataset: Dataset, path: Path) -> None:
@@ -89,6 +91,31 @@ def cmd_gamefiles(args: argparse.Namespace) -> int:
     write_dataset(dataset, args.output)
     print(f"Wrote {args.output}")
     _report(dataset)
+    return 0
+
+
+def cmd_icons(args: argparse.Namespace) -> int:
+    """Copy pal icon textures from an extraction into the web UI's icon set."""
+    try:
+        dataset = load_dataset(args.dataset)
+    except DatasetError as exc:
+        print(f"invalid dataset: {exc}", file=sys.stderr)
+        return 1
+
+    try:
+        report = sync_icons(args.root, args.output, dataset)
+    except IngestError as exc:
+        print(f"icon sync failed: {exc}", file=sys.stderr)
+        return 1
+
+    print(f"Copied {report.coverage} pal icons to {args.output}")
+    if report.unmatched_files:
+        print(f"  {report.unmatched_files} file(s) in the extraction matched no pal")
+    if report.missing:
+        print(f"  {len(report.missing)} pal(s) with no icon in this extraction:")
+        preview = ", ".join(report.missing[:20])
+        suffix = " ..." if len(report.missing) > 20 else ""
+        print(f"    {preview}{suffix}")
     return 0
 
 
@@ -279,6 +306,18 @@ def build_parser() -> argparse.ArgumentParser:
     gamefiles.add_argument("--locale", default="en")
     gamefiles.add_argument("--game-version", default=None)
     gamefiles.set_defaults(func=cmd_gamefiles)
+
+    icons = sub.add_parser(
+        "icons", help="copy pal icons from the same kind of extraction into the web UI"
+    )
+    icons.add_argument(
+        "root",
+        type=Path,
+        help="directory containing Pal/Content/... from an asset extraction",
+    )
+    icons.add_argument("--output", type=Path, default=DEFAULT_ICONS_DIR)
+    icons.add_argument("--dataset", type=Path, default=DEFAULT_OUTPUT)
+    icons.set_defaults(func=cmd_icons)
 
     scrape = sub.add_parser("scrape", help="build a dataset from a community wiki")
     scrape.add_argument("--base-url", default="https://paldb.cc")

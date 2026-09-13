@@ -27,7 +27,7 @@ palworld-ingest = "palworld_api.ingest.cli:main"
 where = ["src"]
 
 [tool.setuptools.package-data]
-palworld_api = ["web/*.html"]
+palworld_api = ["web/*.html", "web/icons/*.png"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

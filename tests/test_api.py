@@ -260,3 +260,29 @@ def test_unknown_activity_is_422(client: TestClient) -> None:
 def test_work_endpoints_carry_provenance(client: TestClient) -> None:
     for endpoint in ("/work", "/work/mining/best"):
         assert client.get(endpoint).json()["data_quality"]["source"] == "demo"
+
+
+def test_pal_summary_has_no_icon_when_none_exists(client: TestClient) -> None:
+    # The demo dataset's ids (demo_wooly, ...) never match a real icon file.
+    pals = client.get("/pals?limit=5").json()
+    assert all(p["icon"] is None for p in pals)
+
+
+def test_pal_detail_reports_icon_as_none_when_missing(client: TestClient) -> None:
+    body = client.get("/pals/demo_forge").json()
+    assert body["icon"] is None
+
+
+def test_pal_summary_reports_an_icon_url_when_one_exists(dataset_path: Path) -> None:
+    services = api_module.Services(dataset_path)
+    services.icon_ids = frozenset({"demo_forge"})
+    app.dependency_overrides[get_services] = lambda: services
+    try:
+        with TestClient(app) as test_client:
+            body = test_client.get("/pals/demo_forge").json()
+            assert body["icon"] == "/ui/icons/demo_forge.png"
+
+            summaries = test_client.get("/pals?search=forge").json()
+            assert summaries[0]["icon"] == "/ui/icons/demo_forge.png"
+    finally:
+        app.dependency_overrides.clear()

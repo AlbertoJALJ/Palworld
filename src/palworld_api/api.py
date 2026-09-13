@@ -22,6 +22,7 @@ from pydantic import BaseModel, Field
 
 from .breeding import BreedingEngine, BreedingError
 from .dataset import DatasetError, PalIndex, find_default_dataset, load_dataset
+from .ingest.icons import existing_icon_ids
 from .inheritance import InheritanceEngine
 from .models import Element, Work
 from .passives import PROFILES, PassiveEngine, WorkRanking
@@ -30,6 +31,7 @@ from .routes import RouteError, RoutePlanner, Strategy
 _ENV_DATASET = os.environ.get("PALWORLD_DATASET")
 DEFAULT_DATASET = Path(_ENV_DATASET) if _ENV_DATASET else find_default_dataset()
 WEB_DIR = Path(__file__).parent / "web"
+ICONS_DIR = WEB_DIR / "icons"
 
 
 class Services:
@@ -43,6 +45,18 @@ class Services:
         self.planner = RoutePlanner(self.index, self.breeding)
         self.passives = PassiveEngine(self.index)
         self.inheritance = InheritanceEngine(self.dataset.inheritance, self.index)
+        # Read once at startup rather than stat-ing a file on every /pals
+        # request: the icon set only changes when someone re-runs `cli icons`,
+        # which restarts the process anyway.
+        self.icon_ids = existing_icon_ids(ICONS_DIR)
+
+    def icon_url(self, pal_id: str) -> str | None:
+        """The pal's icon URL, or None when this dataset has no icon for it.
+
+        None rather than a guessed path: a client should never have to load an
+        image to find out it doesn't exist.
+        """
+        return f"/ui/icons/{pal_id}.png" if pal_id in self.icon_ids else None
 
     @property
     def data_warning(self) -> str | None:
@@ -85,6 +99,7 @@ class PalSummary(BaseModel):
     combi_rank: int | None
     breedable: bool
     wild_obtainable: bool
+    icon: str | None = None
 
 
 class BreedResponse(BaseModel):
@@ -266,6 +281,7 @@ def list_pals(
             combi_rank=p.combi_rank,
             breedable=p.is_breedable_child,
             wild_obtainable=p.wild_obtainable,
+            icon=services.icon_url(p.id),
         )
         for p in window
     ]
@@ -278,6 +294,7 @@ def get_pal(pal_id: str, services: ServicesDep) -> dict[str, Any]:
         raise HTTPException(status_code=404, detail=f"unknown pal: {pal_id!r}")
     return {
         "pal": pal.model_dump(mode="json", exclude_none=True),
+        "icon": services.icon_url(pal.id),
         "data_quality": _quality(services).model_dump(),
     }
 

@@ -67,6 +67,30 @@ python -m palworld_api.ingest.cli scrape --limit 5
 Every API response carries a `data_quality` block, so a client can tell
 game-file data from wiki or demo data without reading this file.
 
+## Icons
+
+The web UI shows each pal's own icon, not just its name, in every picker and
+result list. Same approach as the dataset: read out of the game's own texture
+extraction rather than drawn or scraped, matched to a pal by the same tribe id
+`gamefiles.py` already uses, so no new naming convention to maintain.
+
+```bash
+python -m palworld_api.ingest.cli icons <extraction-root> --dataset data/pals.json
+```
+
+`<extraction-root>` is the same kind of directory `gamefiles` reads, this time
+looking under `Pal/Content/Pal/Texture/PalIcon/Normal/`. Currently 288/288 pals
+have an icon; a pal with none shows a colored initial instead of a broken image
+(see `WorkRanking`-style honesty elsewhere in this project — a gap is reported,
+never guessed at).
+
+> **Licensing.** Same note as the dataset, same answer: these are Pocketpair's
+> own icon textures, extracted rather than drawn. This project is open source
+> and non-commercial, which is why the icons are checked in, but that is a
+> mitigating factor, not a license grant — it is your call whether to keep
+> them. `src/palworld_api/web/icons/*.png` is regenerable from any extraction
+> in one command, so removing it costs nothing but re-running `icons`.
+
 ## Quick start
 
 ```bash
@@ -236,9 +260,10 @@ src/palworld_api/
   web/            The UI the API serves at /
   ingest/
     gamefiles.py  The game's own DataTables. The real source.
+    icons.py      Pal icon textures, matched by the same tribe id
     paldb.py      Community-wiki scraper. Fallback, selectors unvalidated.
     demo.py       Synthetic pals, for smoke tests
-    cli.py        Build, validate, cross-check
+    cli.py        Build, validate, cross-check, sync icons
 ```
 
 The dependency runs one way: nothing in `ingest/` is imported by the engine, so
@@ -266,7 +291,7 @@ were never measured.
 ## Development
 
 ```bash
-python -m pytest        # 156 tests
+python -m pytest        # 168 tests
 python -m ruff check src tests
 ```
 
