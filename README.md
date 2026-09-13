@@ -77,6 +77,14 @@ suitability, guaranteed (innate) passives, and — beyond what a static wiki
 page shows — the actual best passive loadout for base and combat, computed
 live by this project's own optimiser rather than hand-picked.
 
+Every element and work suitability badge carries a small line-icon glyph next
+to its label (a flame for fire, a droplet for watering, crossed picks for
+mining, ...), both here and on the Work tab. These are hand-drawn geometric
+SVGs, `currentColor`-based so they always match the surrounding text — not
+extracted game art, since a generic symbol for "fire" or "mining" isn't
+Pocketpair-specific creative work the way a pal portrait is, so there's
+nothing to source-and-license here in the first place.
+
 Two real gaps surfaced building it, both now fixed:
 
 - **Every pal was missing HP.** The source field is `Hp` (lowercase `p`); the
