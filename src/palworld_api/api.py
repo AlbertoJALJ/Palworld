@@ -21,13 +21,14 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from .breeding import BreedingEngine, BreedingError
-from .dataset import DatasetError, PalIndex, load_dataset
+from .dataset import DatasetError, PalIndex, find_default_dataset, load_dataset
 from .inheritance import InheritanceEngine
 from .models import Element, Work
 from .passives import PROFILES, PassiveEngine
 from .routes import RouteError, RoutePlanner, Strategy
 
-DEFAULT_DATASET = Path(os.environ.get("PALWORLD_DATASET", "data/pals.json"))
+_ENV_DATASET = os.environ.get("PALWORLD_DATASET")
+DEFAULT_DATASET = Path(_ENV_DATASET) if _ENV_DATASET else find_default_dataset()
 WEB_DIR = Path(__file__).parent / "web"
 
 

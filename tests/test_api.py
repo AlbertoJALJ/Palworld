@@ -196,3 +196,31 @@ def test_ui_is_served(client: TestClient) -> None:
     response = client.get("/")
     assert response.status_code == 200
     assert "Palworld" in response.text
+
+
+def test_default_dataset_is_found_from_any_directory(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Starting the server outside the repo root must still work.
+
+    The lookup walks up from the package, so an editable install finds its own
+    `data/` regardless of where the process was launched. Getting this wrong
+    fails on every request rather than at startup, which is far harder to read.
+    """
+    from palworld_api.dataset import find_default_dataset
+
+    monkeypatch.chdir(tmp_path)
+    found = find_default_dataset()
+    assert found.exists(), f"{found} should have been found from {tmp_path}"
+    assert found.name == "pals.json"
+
+
+def test_a_local_data_directory_wins(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from palworld_api.dataset import find_default_dataset
+
+    (tmp_path / "data").mkdir()
+    (tmp_path / "data" / "pals.json").write_text("{}")
+    monkeypatch.chdir(tmp_path)
+    assert find_default_dataset() == Path("data/pals.json")

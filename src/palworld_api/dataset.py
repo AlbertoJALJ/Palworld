@@ -137,13 +137,36 @@ class PalIndex:
         )
 
 
+def find_default_dataset(name: str = "pals.json") -> Path:
+    """Locate the dataset without depending on the working directory.
+
+    Looks in `data/` under the current directory first, so a checkout in hand
+    wins, then walks up from this module to find the `data/` directory of an
+    editable install. Without this, running the server from anywhere but the
+    repository root fails on every request instead of just working.
+    """
+    local = Path("data") / name
+    if local.exists():
+        return local
+
+    for parent in Path(__file__).resolve().parents:
+        candidate = parent / "data" / name
+        if candidate.exists():
+            return candidate
+
+    # Nothing found: hand back the conventional path so the error message
+    # names what the user expected rather than some deep absolute path.
+    return local
+
+
 def load_dataset(path: str | Path) -> Dataset:
     """Read and validate a dataset JSON document."""
     path = Path(path)
     if not path.exists():
         raise DatasetError(
-            f"dataset not found at {path}. Run `python -m palworld_api.ingest.cli "
-            f"scrape` to build one, or point PALWORLD_DATASET at an existing file."
+            f"dataset not found at {path}. Build one with "
+            f"`python -m palworld_api.ingest.cli gamefiles <extraction-root>`, or "
+            f"point the PALWORLD_DATASET environment variable at an existing file."
         )
     try:
         raw = json.loads(path.read_text(encoding="utf-8"))
