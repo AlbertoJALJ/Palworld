@@ -224,3 +224,39 @@ def test_a_local_data_directory_wins(
     (tmp_path / "data" / "pals.json").write_text("{}")
     monkeypatch.chdir(tmp_path)
     assert find_default_dataset() == Path("data/pals.json")
+
+
+def test_work_overview_lists_best_pal_per_activity(client: TestClient) -> None:
+    body = client.get("/work").json()
+    assert "mining" in body["by_work"]
+    assert body["by_work"]["mining"][0]["pal"] == "demo_titan"
+    assert body["by_work"]["mining"][0]["level"] == 4
+    assert body["data_quality"]["source"] == "demo"
+
+
+def test_work_overview_omits_activities_nobody_does(client: TestClient) -> None:
+    body = client.get("/work").json()
+    # No demo pal has oil extraction.
+    assert "oil_extraction" not in body["by_work"]
+
+
+def test_work_overview_limit_applies_per_activity(client: TestClient) -> None:
+    body = client.get("/work?limit=1").json()
+    assert all(len(pals) <= 1 for pals in body["by_work"].values())
+
+
+def test_best_pals_for_one_activity_are_ordered(client: TestClient) -> None:
+    body = client.get("/work/mining/best").json()
+    assert body["work"] == "mining"
+    levels = [p["level"] for p in body["pals"]]
+    assert levels == sorted(levels, reverse=True)
+    assert body["pals"][0]["pal"] == "demo_titan"
+
+
+def test_unknown_activity_is_422(client: TestClient) -> None:
+    assert client.get("/work/sandwich/best").status_code == 422
+
+
+def test_work_endpoints_carry_provenance(client: TestClient) -> None:
+    for endpoint in ("/work", "/work/mining/best"):
+        assert client.get(endpoint).json()["data_quality"]["source"] == "demo"

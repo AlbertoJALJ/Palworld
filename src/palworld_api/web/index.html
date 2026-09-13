@@ -97,6 +97,7 @@
     <button class="tab" role="tab" data-view="breed" aria-selected="false">Cruce</button>
     <button class="tab" role="tab" data-view="passives" aria-selected="false">Pasivas</button>
     <button class="tab" role="tab" data-view="parents" aria-selected="false">Progenitores</button>
+    <button class="tab" role="tab" data-view="work" aria-selected="false">Trabajo</button>
   </div>
 
   <div class="panel">
@@ -109,6 +110,24 @@
 const out = document.getElementById("out");
 const controls = document.getElementById("controls");
 let pals = [];
+
+// Labels for the game's base-work suitabilities. The API returns the raw
+// enum value (e.g. "watering"); these are only for display.
+const WORK_LABELS = {
+  watering: "Riego",
+  planting: "Siembra",
+  lumbering: "Tala",
+  mining: "Minería",
+  kindling: "Encendido",
+  generating_electricity: "Generación eléctrica",
+  handiwork: "Manualidades",
+  gathering: "Recolección",
+  medicine_production: "Producción medicinal",
+  cooling: "Enfriamiento",
+  transporting: "Transporte",
+  farming: "Granja",
+  oil_extraction: "Extracción de petróleo",
+};
 
 const VIEWS = {
   route: {
@@ -136,6 +155,17 @@ const VIEWS = {
   parents: {
     fields: [{ id: "pal", label: "Pal", type: "pal" }],
     run: runParents,
+  },
+  work: {
+    fields: [
+      {
+        id: "activity",
+        label: "Actividad",
+        type: "select",
+        options: [["", "Todas (resumen)"], ...Object.entries(WORK_LABELS)],
+      },
+    ],
+    run: runWork,
   },
 };
 
@@ -308,6 +338,58 @@ async function runParents() {
       `${nameOf(pair[0])} + ${nameOf(pair[1])}`));
   }
   if (data.count > 60) out.appendChild(el("p", "meta", `… y ${data.count - 60} más.`));
+}
+
+function workTable(headers) {
+  const scroll = el("div", "scroll");
+  const table = el("table");
+  table.innerHTML = "<thead><tr>" + headers.map((h) => `<th>${h}</th>`).join("") + "</tr></thead>";
+  const body = el("tbody");
+  table.appendChild(body);
+  scroll.appendChild(table);
+  return { scroll, body };
+}
+
+async function runWork() {
+  const activity = value("activity");
+  out.innerHTML = "";
+
+  if (!activity) {
+    // No activity chosen: a one-screen summary across every base activity,
+    // which is the question people actually ask ("who's my best miner?").
+    const data = await api("/work?limit=5");
+    const activities = Object.keys(data.by_work);
+    if (!activities.length) {
+      out.appendChild(el("p", "empty", "Este dataset no trae aptitudes de trabajo."));
+      return;
+    }
+    const { scroll, body } = workTable(["Actividad", "Mejores pals"]);
+    for (const work of activities) {
+      const tr = el("tr");
+      tr.appendChild(el("td", null, WORK_LABELS[work] || work));
+      tr.appendChild(el("td", null,
+        data.by_work[work].map((p) => `${p.name} (Lv.${p.level})`).join(", ")));
+      body.appendChild(tr);
+    }
+    out.appendChild(scroll);
+    return;
+  }
+
+  const data = await api(`/work/${encodeURIComponent(activity)}/best?limit=15`);
+  if (!data.pals.length) {
+    out.appendChild(el("p", "empty", "Ningún pal tiene esta aptitud en este dataset."));
+    return;
+  }
+  out.appendChild(el("p", "meta",
+    `Mejores pals para ${WORK_LABELS[data.work] || data.work}:`));
+  const { scroll, body } = workTable(["Pal", "Nivel"]);
+  for (const p of data.pals) {
+    const tr = el("tr");
+    tr.appendChild(el("td", null, p.name));
+    tr.appendChild(el("td", "num", String(p.level)));
+    body.appendChild(tr);
+  }
+  out.appendChild(scroll);
 }
 
 for (const tab of document.querySelectorAll(".tab")) {

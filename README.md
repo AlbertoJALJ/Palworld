@@ -195,6 +195,8 @@ expected number of eggs, and the eggs needed for 90% confidence.
 | `GET /reachable` | Everything reachable from a starting set |
 | `GET /goals` | The built-in passive goals and their weights |
 | `GET /pals/{id}/passives?goal=` | Optimal loadout for base or combat |
+| `GET /work` | The best pals for every base activity (watering, mining, ...) |
+| `GET /work/{work}/best` | The best pals for one specific activity |
 | `POST /routes/plan` | A route costed out for the passives you want |
 
 ```bash
@@ -264,7 +266,7 @@ were never measured.
 ## Development
 
 ```bash
-python -m pytest        # 140 tests
+python -m pytest        # 156 tests
 python -m ruff check src tests
 ```
 

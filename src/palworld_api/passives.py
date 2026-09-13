@@ -103,6 +103,16 @@ class PassiveRecommendation:
     excluded_restricted: tuple[str, ...] = ()
 
 
+@dataclass(frozen=True, slots=True)
+class WorkRanking:
+    """One pal's placement in the ranking for a single kind of work."""
+
+    work: Work
+    pal_id: str
+    name: str
+    level: int
+
+
 class PassiveEngine:
     """Scores passives against a goal and picks the optimal loadout."""
 
@@ -244,12 +254,34 @@ class PassiveEngine:
         )
         return tuple(winners[:max_slots])
 
-    def rank_pals_for_work(self, work: Work, limit: int = 20) -> tuple[tuple[str, int], ...]:
-        """Pals sorted by their level in one work suitability."""
+    def rank_pals_for_work(self, work: Work, limit: int = 10) -> tuple[WorkRanking, ...]:
+        """The best pals for one kind of work, highest suitability first.
+
+        This is base suitability only -- the level printed on the pal's own
+        card -- not a passive-adjusted score. Ties are broken by display name
+        rather than internal id: the id is an implementation detail (Lamball's
+        id is `sheepball`), and a tie-break nobody reads is not much of one.
+        """
         ranked = [
-            (pal.id, level)
+            (pal, level)
             for pal in self.index.dataset.pals
             if (level := pal.work.get(work, 0)) > 0
         ]
-        ranked.sort(key=lambda item: (-item[1], item[0]))
-        return tuple(ranked[:limit])
+        ranked.sort(key=lambda item: (-item[1], item[0].name))
+        return tuple(
+            WorkRanking(work=work, pal_id=pal.id, name=pal.name, level=level)
+            for pal, level in ranked[:limit]
+        )
+
+    def rank_all_work(self, limit: int = 5) -> dict[Work, tuple[WorkRanking, ...]]:
+        """The best pals for every kind of work, in one pass.
+
+        Skips a work type entirely when no pal in the dataset has it (a work
+        type from a game area this extraction has no pals for, say), rather
+        than returning a misleading empty-but-present entry.
+        """
+        return {
+            work: ranking
+            for work in Work
+            if (ranking := self.rank_pals_for_work(work, limit))
+        }

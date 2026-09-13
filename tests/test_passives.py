@@ -190,3 +190,83 @@ def test_a_passive_that_trades_work_speed_for_sanity_still_scores(
     scored = passive_engine.score_passive(trade, BASE_PROFILE, pal)
     assert scored.score == pytest.approx(90.0 - 15.0 * 0.8)
     assert scored.score < 90.0
+
+
+def test_rank_pals_for_work_orders_by_level(passive_engine: PassiveEngine) -> None:
+    from palworld_api.models import Work
+
+    ranking = passive_engine.rank_pals_for_work(Work.MINING)
+    assert ranking
+    assert ranking[0].pal_id == "p10"
+    assert ranking[0].level == 4
+    levels = [entry.level for entry in ranking]
+    assert levels == sorted(levels, reverse=True)
+
+
+def test_rank_pals_for_work_excludes_pals_without_the_suitability(
+    passive_engine: PassiveEngine,
+) -> None:
+    from palworld_api.models import Work
+
+    ranking = passive_engine.rank_pals_for_work(Work.MINING)
+    assert "p50" not in {entry.pal_id for entry in ranking}
+
+
+def test_rank_pals_for_work_respects_the_limit(passive_engine: PassiveEngine) -> None:
+    from palworld_api.models import Work
+
+    assert len(passive_engine.rank_pals_for_work(Work.MINING, limit=0)) == 0
+
+
+def test_rank_pals_for_work_reports_display_names(passive_engine: PassiveEngine) -> None:
+    from palworld_api.models import Work
+
+    entry = passive_engine.rank_pals_for_work(Work.MINING)[0]
+    assert entry.name == passive_engine.index.require(entry.pal_id).name
+
+
+def test_rank_pals_for_work_ties_break_by_name_not_id() -> None:
+    """A regression test for exactly the fix this ranking needed.
+
+    Two pals tied on level must come back in a stable, human-readable order --
+    by display name -- rather than by internal id, which is an implementation
+    detail nobody reading the ranking ever sees.
+    """
+    from palworld_api.dataset import PalIndex
+    from palworld_api.models import Confidence, Dataset, Pal, Provenance, Work
+    from palworld_api.passives import PassiveEngine as Engine
+
+    seed = Provenance(source="test", confidence=Confidence.SEED)
+    dataset = Dataset(
+        pals=(
+            # Id order (zpal < zzpal) is the reverse of name order on purpose.
+            Pal(id="zzpal", name="Aardvark", combi_rank=1, work={Work.MINING: 3}, provenance=seed),
+            Pal(id="zpal", name="Zebra", combi_rank=2, work={Work.MINING: 3}, provenance=seed),
+        )
+    )
+    engine = Engine(PalIndex(dataset))
+    ranking = engine.rank_pals_for_work(Work.MINING)
+    assert [entry.name for entry in ranking] == ["Aardvark", "Zebra"]
+
+
+def test_rank_all_work_covers_every_work_type_present(passive_engine: PassiveEngine) -> None:
+    from palworld_api.models import Work
+
+    overview = passive_engine.rank_all_work()
+    assert Work.MINING in overview
+    assert overview[Work.MINING][0].pal_id == "p10"
+
+
+def test_rank_all_work_omits_work_types_nobody_has(passive_engine: PassiveEngine) -> None:
+    from palworld_api.models import Work
+
+    overview = passive_engine.rank_all_work()
+    # No fixture pal has any watering suitability.
+    assert Work.WATERING not in overview
+
+
+def test_rank_all_work_limit_applies_per_work_type(passive_engine: PassiveEngine) -> None:
+    from palworld_api.models import Work
+
+    overview = passive_engine.rank_all_work(limit=1)
+    assert len(overview[Work.MINING]) <= 1

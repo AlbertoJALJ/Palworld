@@ -24,7 +24,7 @@ from .breeding import BreedingEngine, BreedingError
 from .dataset import DatasetError, PalIndex, find_default_dataset, load_dataset
 from .inheritance import InheritanceEngine
 from .models import Element, Work
-from .passives import PROFILES, PassiveEngine
+from .passives import PROFILES, PassiveEngine, WorkRanking
 from .routes import RouteError, RoutePlanner, Strategy
 
 _ENV_DATASET = os.environ.get("PALWORLD_DATASET")
@@ -135,6 +135,23 @@ class PassiveSetResponse(BaseModel):
     total_score: float
     considered: int
     passives: list[PassiveResponse]
+    data_quality: DataQuality
+
+
+class WorkRankingEntry(BaseModel):
+    pal: str
+    name: str
+    level: int
+
+
+class WorkBestResponse(BaseModel):
+    work: Work
+    pals: list[WorkRankingEntry]
+    data_quality: DataQuality
+
+
+class WorkOverviewResponse(BaseModel):
+    by_work: dict[str, list[WorkRankingEntry]]
     data_quality: DataQuality
 
 
@@ -433,6 +450,38 @@ def best_passives(
             for p in recommendation.passives
         ],
         data_quality=_quality(services),
+    )
+
+
+def _entries(ranking: tuple[WorkRanking, ...]) -> list[WorkRankingEntry]:
+    return [WorkRankingEntry(pal=r.pal_id, name=r.name, level=r.level) for r in ranking]
+
+
+@app.get("/work", response_model=WorkOverviewResponse, tags=["passives"])
+def best_pals_by_work(
+    services: ServicesDep,
+    limit: int = Query(default=5, ge=1, le=50, description="Pals per activity."),
+) -> WorkOverviewResponse:
+    """The best pals for every base activity: watering, planting, mining, and
+    so on. This is base work suitability -- the level shown on the pal's own
+    card -- not a passive-adjusted score; see `/pals/{id}/passives?goal=base`
+    for the passive side of base optimisation instead.
+    """
+    overview = services.passives.rank_all_work(limit)
+    return WorkOverviewResponse(
+        by_work={work.value: _entries(ranking) for work, ranking in overview.items()},
+        data_quality=_quality(services),
+    )
+
+
+@app.get("/work/{work}/best", response_model=WorkBestResponse, tags=["passives"])
+def best_pals_for_work(
+    work: Work, services: ServicesDep, limit: int = Query(default=10, ge=1, le=100)
+) -> WorkBestResponse:
+    """The best pals for one specific activity, most suited first."""
+    ranking = services.passives.rank_pals_for_work(work, limit)
+    return WorkBestResponse(
+        work=work, pals=_entries(ranking), data_quality=_quality(services)
     )
 
 
