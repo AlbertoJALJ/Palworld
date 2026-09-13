@@ -144,6 +144,53 @@
     border: 1px solid var(--line); border-radius: 999px; font-size: 0.82rem;
     white-space: nowrap;
   }
+
+  .detail-header { display: flex; gap: 16px; margin-bottom: 20px; flex-wrap: wrap; }
+  .detail-icon {
+    width: 88px; height: 88px; border-radius: 14px; flex: 0 0 auto;
+    object-fit: cover; background: var(--bg); border: 1px solid var(--line);
+  }
+  .detail-icon.placeholder {
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; font-size: 2rem; font-weight: 700;
+  }
+  .detail-title { display: flex; flex-direction: column; gap: 4px; justify-content: center; }
+  .detail-paldeck { color: var(--muted); font-size: 0.8rem; }
+  .detail-name { font-size: 1.35rem; font-weight: 700; }
+  .badge-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 2px; }
+  .badge {
+    display: inline-flex; align-items: center; padding: 2px 10px; border-radius: 999px;
+    font-size: 0.75rem; font-weight: 600; color: #fff;
+  }
+  .badge.outline {
+    background: transparent; border: 1px solid var(--line); color: var(--muted); font-weight: 500;
+  }
+  .badge.rarity-common { background: #7d8794; }
+  .badge.rarity-rare { background: #2f6df6; }
+  .badge.rarity-epic { background: #7b3fbf; }
+  .badge.rarity-legendary { background: #c8912a; }
+
+  .detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+  @media (max-width: 640px) { .detail-grid { grid-template-columns: 1fr; } }
+  .detail-section { margin-bottom: 22px; }
+  .detail-section h3 {
+    font-size: 0.82rem; text-transform: uppercase; letter-spacing: 0.04em;
+    color: var(--muted); margin: 0 0 10px;
+  }
+  .stat-row { margin-bottom: 9px; }
+  .stat-row .stat-label {
+    display: flex; justify-content: space-between; font-size: 0.82rem; margin-bottom: 3px;
+  }
+  .stat-row .stat-value { font-variant-numeric: tabular-nums; color: var(--muted); }
+  .stat-track {
+    height: 7px; border-radius: 999px; background: var(--bg); border: 1px solid var(--line);
+    overflow: hidden;
+  }
+  .stat-fill { height: 100%; background: var(--accent); border-radius: 999px; }
+  .passive-card {
+    border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; margin-bottom: 8px;
+  }
+  .passive-card .name { font-weight: 600; font-size: 0.9rem; }
 </style>
 </head>
 <body>
@@ -167,6 +214,7 @@
     <button class="tab" role="tab" data-view="passives" aria-selected="false"></button>
     <button class="tab" role="tab" data-view="parents" aria-selected="false"></button>
     <button class="tab" role="tab" data-view="work" aria-selected="false"></button>
+    <button class="tab" role="tab" data-view="detail" aria-selected="false"></button>
   </div>
 
   <div class="panel">
@@ -192,7 +240,7 @@ const I18N = {
   es: {
     heading: "Palworld Data API",
     subtitle: "Consultas de crianza, rutas y pasivas contra la API local.",
-    tabs: { route: "Ruta", breed: "Cruce", passives: "Pasivas", parents: "Progenitores", work: "Trabajo" },
+    tabs: { route: "Ruta", breed: "Cruce", passives: "Pasivas", parents: "Progenitores", work: "Trabajo", detail: "Detalle" },
     target: "Objetivo", owned: "Pals que tienes (coma)", ownedPlaceholder: "vacío = todos los capturables",
     strategy: "Estrategia", generations: "Generaciones", tree: "Árbol",
     parentA: "Progenitor A", parentB: "Progenitor B",
@@ -228,11 +276,28 @@ const I18N = {
       medicine_production: "Producción medicinal", cooling: "Enfriamiento",
       transporting: "Transporte", farming: "Granja", oil_extraction: "Extracción de petróleo",
     },
+    paldeckNo: (n) => `N.º ${n}`,
+    rarityCommon: "Común", rarityRare: "Raro", rarityEpic: "Épico", rarityLegendary: "Legendario",
+    wildObtainable: "Capturable en el mundo", breedOnly: "Solo por crianza",
+    genderRatio: (m, f) => `${m}% macho / ${f}% hembra`,
+    statsHeading: "Estadísticas", workHeading: "Idoneidad para el Trabajo",
+    innatePassivesHeading: "Pasivas Garantizadas", noInnatePassives: "Ninguna.",
+    bestForBase: "Mejores pasivas para Base", bestForCombat: "Mejores pasivas para Combate",
+    noWorkSuitability: "Sin idoneidades de trabajo registradas.",
+    stat_hp: "PV", stat_melee_attack: "Ataque Cuerpo a Cuerpo", stat_ranged_attack: "Ataque a Distancia",
+    stat_defense: "Defensa", stat_support: "Soporte", stat_stamina: "Energía",
+    stat_run_speed: "Velocidad de Carrera", stat_mount_run_speed: "Velocidad en Montura",
+    stat_walk_speed: "Velocidad de Caminata Lenta", stat_price: "Precio",
+    elements: {
+      neutral: "Normal", fire: "Fuego", water: "Agua", grass: "Hoja",
+      electric: "Electricidad", ice: "Hielo", ground: "Tierra", dark: "Oscuridad",
+      dragon: "Dragón",
+    },
   },
   en: {
     heading: "Palworld Data API",
     subtitle: "Breeding, route and passive queries against the local API.",
-    tabs: { route: "Route", breed: "Breed", passives: "Passives", parents: "Parents", work: "Work" },
+    tabs: { route: "Route", breed: "Breed", passives: "Passives", parents: "Parents", work: "Work", detail: "Detail" },
     target: "Target", owned: "Pals you own (comma)", ownedPlaceholder: "empty = everything catchable",
     strategy: "Strategy", generations: "Generations", tree: "Tree",
     parentA: "Parent A", parentB: "Parent B",
@@ -267,6 +332,22 @@ const I18N = {
       handiwork: "Handiwork", gathering: "Gathering",
       medicine_production: "Medicine Production", cooling: "Cooling",
       transporting: "Transporting", farming: "Farming", oil_extraction: "Oil Extraction",
+    },
+    paldeckNo: (n) => `No. ${n}`,
+    rarityCommon: "Common", rarityRare: "Rare", rarityEpic: "Epic", rarityLegendary: "Legendary",
+    wildObtainable: "Catchable in the world", breedOnly: "Breeding only",
+    genderRatio: (m, f) => `${m}% male / ${f}% female`,
+    statsHeading: "Stats", workHeading: "Work Suitability",
+    innatePassivesHeading: "Guaranteed Passives", noInnatePassives: "None.",
+    bestForBase: "Best passives for Base", bestForCombat: "Best passives for Combat",
+    noWorkSuitability: "No recorded work suitabilities.",
+    stat_hp: "HP", stat_melee_attack: "Melee Attack", stat_ranged_attack: "Ranged Attack",
+    stat_defense: "Defense", stat_support: "Support", stat_stamina: "Stamina",
+    stat_run_speed: "Run Speed", stat_mount_run_speed: "Mount Run Speed",
+    stat_walk_speed: "Slow Walk Speed", stat_price: "Price",
+    elements: {
+      neutral: "Neutral", fire: "Fire", water: "Water", grass: "Grass",
+      electric: "Electric", ice: "Ice", ground: "Ground", dark: "Dark", dragon: "Dragon",
     },
   },
 };
@@ -318,6 +399,10 @@ function buildViews() {
       ],
       run: runWork,
     },
+    detail: {
+      fields: [{ id: "pal", label: t("pal"), type: "pal" }],
+      run: runDetail,
+    },
   };
 }
 
@@ -330,7 +415,7 @@ const ELEMENT_COLORS = {
 };
 
 function palIcon(pal, size) {
-  const className = size === "small" ? "pal-icon small" : "pal-icon";
+  const className = size === "small" ? "pal-icon small" : size === "large" ? "detail-icon" : "pal-icon";
   if (pal && pal.icon) {
     const img = document.createElement("img");
     img.className = className;
@@ -339,7 +424,7 @@ function palIcon(pal, size) {
     img.loading = "lazy";
     return img;
   }
-  const badge = el("div", className);
+  const badge = el("div", className + " placeholder");
   badge.style.background = ELEMENT_COLORS[(pal && pal.elements && pal.elements[0]) || "neutral"];
   badge.textContent = pal ? pal.name.charAt(0) : "?";
   return badge;
@@ -719,6 +804,147 @@ async function runWork() {
     body.appendChild(tr);
   }
   out.appendChild(scroll);
+}
+
+// Visual caps for the base-stat bars: not game data, just how much of the bar
+// a typical value fills. A pal whose stat exceeds its cap still shows a full
+// bar rather than overflowing or erroring.
+const STAT_CAPS = {
+  hp: 200, melee_attack: 200, ranged_attack: 200, defense: 200, support: 200,
+  stamina: 500, run_speed: 1500, mount_run_speed: 2000, walk_speed: 300, price: 10000,
+};
+const STAT_ORDER = [
+  "hp", "melee_attack", "ranged_attack", "defense", "support",
+  "stamina", "run_speed", "mount_run_speed", "walk_speed", "price",
+];
+
+// Rarity has no explicit tier field in the dataset, only the raw number the
+// game itself uses; these breakpoints were reverse-engineered from known
+// rarity/tier pairs and are a display grouping, not new data.
+function rarityInfo(rarity) {
+  if (rarity >= 20) return { label: t("rarityLegendary"), cls: "rarity-legendary" };
+  if (rarity >= 8) return { label: t("rarityEpic"), cls: "rarity-epic" };
+  if (rarity >= 6) return { label: t("rarityRare"), cls: "rarity-rare" };
+  return { label: t("rarityCommon"), cls: "rarity-common" };
+}
+
+function statBar(key, rawValue) {
+  const row = el("div", "stat-row");
+  const label = el("div", "stat-label");
+  label.appendChild(el("span", null, t("stat_" + key)));
+  label.appendChild(el("span", "stat-value", String(rawValue)));
+  row.appendChild(label);
+  const track = el("div", "stat-track");
+  const fill = el("div", "stat-fill");
+  const pct = Math.max(2, Math.min(100, (rawValue / STAT_CAPS[key]) * 100));
+  fill.style.width = pct + "%";
+  track.appendChild(fill);
+  row.appendChild(track);
+  return row;
+}
+
+function passiveCards(heading, recommendation) {
+  const section = el("div", "detail-section");
+  section.appendChild(el("h3", null, heading));
+  if (!recommendation.passives.length) {
+    section.appendChild(el("p", "empty", t("noUsefulPassives")));
+    return section;
+  }
+  for (const passive of recommendation.passives) {
+    const card = el("div", "passive-card");
+    card.appendChild(el("div", "name", passive.name));
+    card.appendChild(el("div", "meta", String(passive.score)));
+    section.appendChild(card);
+  }
+  return section;
+}
+
+async function runDetail() {
+  const id = value("pal");
+  const [detail, combat, base] = await Promise.all([
+    api(`/pals/${encodeURIComponent(id)}`),
+    api(`/pals/${encodeURIComponent(id)}/passives?goal=combat`),
+    api(`/pals/${encodeURIComponent(id)}/passives?goal=base`),
+  ]);
+  const pal = detail.pal;
+  out.innerHTML = "";
+
+  const header = el("div", "detail-header");
+  header.appendChild(palIcon({ ...pal, icon: detail.icon }, "large"));
+
+  const title = el("div", "detail-title");
+  if (pal.paldeck) title.appendChild(el("div", "detail-paldeck", t("paldeckNo")(pal.paldeck)));
+  title.appendChild(el("div", "detail-name", pal.name));
+
+  const badges = el("div", "badge-row");
+  if (pal.rarity !== undefined && pal.rarity !== null) {
+    const info = rarityInfo(pal.rarity);
+    badges.appendChild(el("span", "badge " + info.cls, `${pal.rarity} ${info.label}`));
+  }
+  for (const elementName of pal.elements || []) {
+    const badge = el("span", "badge", t("elements")[elementName] || elementName);
+    badge.style.background = ELEMENT_COLORS[elementName] || ELEMENT_COLORS.neutral;
+    badges.appendChild(badge);
+  }
+  badges.appendChild(
+    el("span", "badge outline", pal.wild_obtainable ? t("wildObtainable") : t("breedOnly"))
+  );
+  if (pal.male_probability !== undefined && pal.male_probability !== null) {
+    badges.appendChild(
+      el("span", "badge outline", t("genderRatio")(pal.male_probability, 100 - pal.male_probability))
+    );
+  }
+  title.appendChild(badges);
+  header.appendChild(title);
+  out.appendChild(header);
+
+  const grid = el("div", "detail-grid");
+
+  const statsColumn = el("div");
+  const statsSection = el("div", "detail-section");
+  statsSection.appendChild(el("h3", null, t("statsHeading")));
+  const baseStats = pal.base_stats || {};
+  const presentStats = STAT_ORDER.filter((key) => baseStats[key] !== undefined);
+  if (presentStats.length) {
+    for (const key of presentStats) statsSection.appendChild(statBar(key, baseStats[key]));
+  } else {
+    statsSection.appendChild(el("p", "empty", t("none")));
+  }
+  statsColumn.appendChild(statsSection);
+  grid.appendChild(statsColumn);
+
+  const infoColumn = el("div");
+
+  const workSection = el("div", "detail-section");
+  workSection.appendChild(el("h3", null, t("workHeading")));
+  const workEntries = Object.entries(pal.work || {});
+  if (workEntries.length) {
+    const list = el("div", "chip-list");
+    for (const [workKey, level] of workEntries) {
+      list.appendChild(el("span", "chip", `${t("work")[workKey] || workKey} · Lv.${level}`));
+    }
+    workSection.appendChild(list);
+  } else {
+    workSection.appendChild(el("p", "empty", t("noWorkSuitability")));
+  }
+  infoColumn.appendChild(workSection);
+
+  const innateSection = el("div", "detail-section");
+  innateSection.appendChild(el("h3", null, t("innatePassivesHeading")));
+  if (detail.innate_passives && detail.innate_passives.length) {
+    for (const passive of detail.innate_passives) {
+      innateSection.appendChild(el("div", "passive-card", passive.name));
+    }
+  } else {
+    innateSection.appendChild(el("p", "empty", t("noInnatePassives")));
+  }
+  infoColumn.appendChild(innateSection);
+
+  infoColumn.appendChild(passiveCards(t("bestForCombat"), combat));
+  infoColumn.appendChild(passiveCards(t("bestForBase"), base));
+
+  grid.appendChild(infoColumn);
+  out.appendChild(grid);
 }
 
 for (const tab of document.querySelectorAll(".tab")) {

@@ -33,12 +33,23 @@ def _monster(zukan: int, rank: int, **overrides) -> dict:
         "ElementType2": "EPalElementType::None",
         "MaleProbability": 50,
         "Rarity": 5,
-        "HP": 100,
+        "Hp": 100,
         "MeleeAttack": 100,
+        "ShotAttack": 100,
         "Defense": 100,
+        "Support": 100,
+        "Stamina": 100,
+        "RunSpeed": 400,
+        "RideSprintSpeed": 500,
+        "SlowWalkSpeed": 100,
+        "Price": 500,
         "CraftSpeed": 100,
         "WorkSuitability_Mining": 0,
         "WorkSuitability_Handcraft": 0,
+        "PassiveSkill1": "None",
+        "PassiveSkill2": "None",
+        "PassiveSkill3": "None",
+        "PassiveSkill4": "None",
     }
     row.update(overrides)
     return row
@@ -64,12 +75,14 @@ def root(tmp_path: Path) -> Path:
 
     monsters = {
         "Anubis": _monster(139, 480, WorkSuitability_Mining=6, WorkSuitability_Handcraft=6),
-        "Lamball": _monster(1, 1470),
+        "Lamball": _monster(1, 1470, PassiveSkill1="Legend"),
         # Case differs from its localisation key on purpose.
         "WindChimes": _monster(38, 2780),
         # Excluded from the rank formula; breeds only via a unique pair.
         "IceHorse": _monster(110, 150, IgnoreCombi=True),
-        "CatMage": _monster(79, 2040),
+        # References test/unreleased content in one slot: must be dropped,
+        # not fail the dataset's referential-integrity check.
+        "CatMage": _monster(79, 2040, PassiveSkill1="Legend", PassiveSkill2="NotInCatalog"),
         "FoxMage": _monster(78, 2080),
         "CatMage_Fire": _monster(79, 1800),
         "FoxMage_Dark": _monster(78, 1900),
@@ -263,8 +276,40 @@ def test_core_fields_are_read(dataset) -> None:
     assert anubis.elements == (Element.GROUND,)
     assert anubis.work == {Work.MINING: 6, Work.HANDIWORK: 6}
     assert anubis.stats[Stat.ATTACK] == 100.0
+    assert anubis.stats[Stat.HP] == 100.0
     assert anubis.male_probability == 50
     assert anubis.provenance.confidence.value == "game_files"
+
+
+def test_base_stats_cover_the_full_combat_sheet(dataset) -> None:
+    anubis = next(p for p in dataset.pals if p.id == "anubis")
+    assert anubis.base_stats.hp == 100.0
+    assert anubis.base_stats.melee_attack == 100.0
+    assert anubis.base_stats.ranged_attack == 100.0
+    assert anubis.base_stats.defense == 100.0
+    assert anubis.base_stats.support == 100.0
+    assert anubis.base_stats.stamina == 100.0
+    assert anubis.base_stats.run_speed == 400.0
+    assert anubis.base_stats.mount_run_speed == 500.0
+    assert anubis.base_stats.walk_speed == 100.0
+    assert anubis.base_stats.price == 500.0
+
+
+def test_base_stats_field_missing_from_source_stays_none(root: Path) -> None:
+    import json
+
+    monster_path = (
+        root / "Pal" / "Content" / "Pal" / "DataTable" / "Character"
+        / "DT_PalMonsterParameter.json"
+    )
+    monsters = json.loads(monster_path.read_text())
+    del monsters[0]["Rows"]["Anubis"]["Price"]
+    monster_path.write_text(json.dumps(monsters))
+
+    dataset = GameFilesSource(root=root, game_version="test").fetch()
+    anubis = next(p for p in dataset.pals if p.id == "anubis")
+    assert anubis.base_stats.price is None
+    assert anubis.base_stats.hp == 100.0  # unrelated fields are unaffected
 
 
 def test_ignore_combi_excludes_a_pal_from_the_formula(dataset) -> None:
@@ -371,6 +416,30 @@ def test_a_file_that_is_not_a_datatable_is_rejected(root: Path) -> None:
     target.write_text(json.dumps({"nope": True}))
     with pytest.raises(IngestError, match="no Rows map"):
         GameFilesSource(root=root).fetch()
+
+
+def test_innate_passives_are_read_from_passive_skill_slots(dataset) -> None:
+    lamball = next(p for p in dataset.pals if p.id == "lamball")
+    assert lamball.innate_passives == ("legend",)
+
+
+def test_a_passive_slot_referencing_test_content_is_dropped(dataset) -> None:
+    catmage = next(p for p in dataset.pals if p.id == "catmage")
+    # Legend (slot 1) survives; NotInCatalog (slot 2) does not exist in the
+    # passive catalog and must be dropped rather than break referential
+    # integrity.
+    assert catmage.innate_passives == ("legend",)
+
+
+def test_dropped_innate_passive_is_reported(root: Path) -> None:
+    source = GameFilesSource(root=root, game_version="test")
+    source.fetch()
+    assert any("NotInCatalog" in w for w in source.warnings)
+
+
+def test_none_and_empty_passive_slots_are_not_innate_passives(dataset) -> None:
+    anubis = next(p for p in dataset.pals if p.id == "anubis")
+    assert anubis.innate_passives == ()
 
 
 def test_an_empty_roster_is_an_error(root: Path) -> None:

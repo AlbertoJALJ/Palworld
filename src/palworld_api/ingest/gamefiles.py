@@ -40,6 +40,7 @@ from ..models import (
     Gender,
     InheritanceConfig,
     Pal,
+    PalBaseStats,
     Passive,
     PassiveEffect,
     Provenance,
@@ -203,11 +204,15 @@ class GameFilesSource:
 
         roster = self._select_pals(monsters, pal_names)
         combos, breed_only = self._build_combos(combos_raw, roster, provenance)
+        # Passives are built first so each pal's innate-passive references
+        # (PassiveSkill1-4) can be checked against real ids as they're read,
+        # rather than validated in a second pass.
+        passives = self._build_passives(passives_raw, skill_names, provenance)
+        known_passive_ids = {p.id for p in passives}
         pals = tuple(
-            self._build_pal(raw_id, row, pal_names, breed_only, provenance)
+            self._build_pal(raw_id, row, pal_names, breed_only, known_passive_ids, provenance)
             for raw_id, row in roster.items()
         )
-        passives = self._build_passives(passives_raw, skill_names, provenance)
 
         return Dataset(
             game_version=self.game_version,
@@ -264,6 +269,7 @@ class GameFilesSource:
         row: dict[str, Any],
         pal_names: dict[str, dict[str, Any]],
         breed_only: set[str],
+        known_passive_ids: set[str],
         provenance: Provenance,
     ) -> Pal:
         # Guaranteed present: the roster filter requires it.
@@ -286,13 +292,15 @@ class GameFilesSource:
         stats = {
             stat: float(row[key])
             for key, stat in (
-                ("HP", Stat.HP),
+                ("Hp", Stat.HP),
                 ("MeleeAttack", Stat.ATTACK),
                 ("Defense", Stat.DEFENSE),
                 ("CraftSpeed", Stat.WORK_SPEED),
             )
             if row.get(key) is not None
         }
+        base_stats = self._build_base_stats(row)
+        innate_passives = self._build_innate_passives(raw_id, row, known_passive_ids)
 
         # IgnoreCombi excludes a pal from the rank formula in both directions.
         # It can still appear in a unique combo, which the engine checks first.
@@ -318,8 +326,58 @@ class GameFilesSource:
             rarity=int(row["Rarity"]) if row.get("Rarity") is not None else None,
             work=work,
             stats=stats,
+            base_stats=base_stats,
+            innate_passives=innate_passives,
             provenance=provenance,
         )
+
+    @staticmethod
+    def _build_base_stats(row: dict[str, Any]) -> PalBaseStats:
+        """The full combat/movement stat sheet, one field per named source field."""
+        fields = {
+            "hp": "Hp",
+            "melee_attack": "MeleeAttack",
+            "ranged_attack": "ShotAttack",
+            "defense": "Defense",
+            "support": "Support",
+            "stamina": "Stamina",
+            "run_speed": "RunSpeed",
+            "mount_run_speed": "RideSprintSpeed",
+            "walk_speed": "SlowWalkSpeed",
+            "price": "Price",
+        }
+        return PalBaseStats(
+            **{
+                field: float(row[key])
+                for field, key in fields.items()
+                if row.get(key) is not None
+            }
+        )
+
+    def _build_innate_passives(
+        self, raw_id: str, row: dict[str, Any], known_passive_ids: set[str]
+    ) -> tuple[str, ...]:
+        """This pal's guaranteed passives, from its PassiveSkill1-4 fields.
+
+        A reference to a skill id that didn't make it into the final passive
+        catalog (test content, an unnamed row) is dropped rather than left to
+        fail the dataset's referential-integrity check, and reported so the
+        drop is visible instead of silent.
+        """
+        found: list[str] = []
+        for slot in (1, 2, 3, 4):
+            raw_skill = row.get(f"PassiveSkill{slot}")
+            if not raw_skill or raw_skill == "None":
+                continue
+            passive_id = slug(raw_skill)
+            if passive_id in known_passive_ids:
+                found.append(passive_id)
+            else:
+                self._warnings.append(
+                    f"{raw_id}: innate passive {raw_skill!r} is not in the passive "
+                    f"catalog (test/unnamed content); dropped"
+                )
+        return tuple(found)
 
     # -- combos -----------------------------------------------------------
 

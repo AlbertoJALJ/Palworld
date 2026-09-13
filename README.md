@@ -67,6 +67,36 @@ python -m palworld_api.ingest.cli scrape --limit 5
 Every API response carries a `data_quality` block, so a client can tell
 game-file data from wiki or demo data without reading this file.
 
+## Pal detail screen
+
+The web UI has a "Detalle"/"Detail" tab showing everything the API knows
+about one pal on a single screen: icon, paldeck number, rarity and element
+badges, gender ratio, the full base stat sheet (HP, melee and ranged attack,
+defense, support, stamina, run/mount/walk speed, price) as bars, work
+suitability, guaranteed (innate) passives, and — beyond what a static wiki
+page shows — the actual best passive loadout for base and combat, computed
+live by this project's own optimiser rather than hand-picked.
+
+Two real gaps surfaced building it, both now fixed:
+
+- **Every pal was missing HP.** The source field is `Hp` (lowercase `p`); the
+  extractor checked for `HP` and got `None` back every time, silently
+  excluded rather than erroring, since a missing field and a differently-cased
+  one look identical to `dict.get`. Existing tests never caught it because
+  none of them asserted on `Stat.HP` specifically.
+- **No pal had a guaranteed passive**, ever, even legendaries that clearly
+  should. The source's `PassiveSkill1`-`PassiveSkill4` fields were never read
+  at all — `Pal.innate_passives` existed on the model but nothing populated
+  it. 45 of 288 pals turned out to have at least one.
+
+The full base stat sheet (`Pal.base_stats`) is a separate field from
+`Pal.stats`, which stays exactly as it was: a small, `Stat`-keyed subset used
+for passive scoring. Most of `base_stats` — price, mount speed, walk speed —
+is never a passive's target, so folding it into the same enum would have
+mixed two different concerns for no benefit. Verified field-for-field against
+a live reference page: HP, both attack stats, defense, support, stamina, and
+all three speeds matched exactly.
+
 ## Icons
 
 The web UI shows each pal's own icon, not just its name, in every picker and
@@ -268,7 +298,7 @@ expected number of eggs, and the eggs needed for 90% confidence.
 |---|---|
 | `GET /health` | Dataset contents and data quality |
 | `GET /pals` | List/filter by element, work, breedability, name (`lang=es\|en`) |
-| `GET /pals/{id}` | Full record (`lang=es\|en`) |
+| `GET /pals/{id}` | Full record: base stats, work, innate passives resolved to names (`lang=es\|en`) |
 | `GET /breed?parent_a=&parent_b=` | What one pair produces, by which rule, and any sex requirement |
 | `GET /pals/{id}/parents` | Every pair that produces this pal |
 | `GET /pals/{id}/children` | What this pal produces with every partner |
@@ -350,7 +380,7 @@ were never measured.
 ## Development
 
 ```bash
-python -m pytest        # 208 tests
+python -m pytest        # 216 tests
 python -m ruff check src tests
 ```
 

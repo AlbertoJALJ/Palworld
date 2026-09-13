@@ -377,3 +377,30 @@ def test_passive_name_stays_english_without_translation(client: TestClient) -> N
 
 def test_invalid_lang_is_422(client: TestClient) -> None:
     assert client.get("/pals?lang=fr").status_code == 422
+
+
+def test_innate_passives_defaults_to_empty_list(client: TestClient) -> None:
+    body = client.get("/pals/demo_forge").json()
+    assert body["innate_passives"] == []
+
+
+def test_innate_passives_are_resolved_to_names(tmp_path: Path) -> None:
+    from palworld_api.models import Dataset, Pal, Passive
+
+    dataset = Dataset(
+        pals=(Pal(id="hero", name="Hero", combi_rank=1, innate_passives=("legend",)),),
+        passives=(Passive(id="legend", name="Legend", tier=3),),
+    )
+    dataset_path = tmp_path / "mini.json"
+    dataset_path.write_text(json.dumps(dataset.model_dump(mode="json", exclude_none=True)))
+
+    from palworld_api.translations import Translations
+
+    services = api_module.Services(dataset_path)
+    services.translations["es"] = Translations(locale="es", passives={"legend": "Leyenda"})
+    with override_services(services), TestClient(app) as test_client:
+        en = test_client.get("/pals/hero").json()
+        es = test_client.get("/pals/hero?lang=es").json()
+
+    assert en["innate_passives"] == [{"id": "legend", "name": "Legend"}]
+    assert es["innate_passives"] == [{"id": "legend", "name": "Leyenda"}]

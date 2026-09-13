@@ -326,6 +326,13 @@ def get_pal(pal_id: str, services: ServicesDep, lang: Lang = "en") -> dict[str, 
     return {
         "pal": body,
         "icon": services.icon_url(pal.id),
+        # `pal.innate_passives` is bare ids, kept that way for schema
+        # consistency; resolved here too so a client showing them doesn't
+        # need a second round trip per passive.
+        "innate_passives": [
+            {"id": pid, "name": services.passive_name(pid, lang)}
+            for pid in pal.innate_passives
+        ],
         "data_quality": _quality(services).model_dump(),
     }
 

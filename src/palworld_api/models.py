@@ -180,6 +180,40 @@ class Passive(BaseModel):
         return not self.restricted_to or pal_id in self.restricted_to
 
 
+class PalBaseStats(BaseModel):
+    """The full per-pal combat and movement stat sheet, as the game tracks it.
+
+    Kept separate from `Pal.stats` (which is keyed by `Stat` and limited to the
+    handful of stats a passive can actually modify) because most of these --
+    price, mount speed, walk speed -- are never a passive's target; they exist
+    to describe the pal itself, not to be scored against a goal. Every field
+    maps to exactly one named field in the source DataTable, so a missing
+    field here means the source genuinely didn't have it, not a mapping choice.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    hp: float | None = None
+    melee_attack: float | None = None
+    ranged_attack: float | None = Field(
+        default=None, description="The game's 'ShotAttack' stat: ranged and elemental attacks."
+    )
+    defense: float | None = None
+    support: float | None = None
+    stamina: float | None = Field(default=None, description="Shown in-game as 'Energy'.")
+    run_speed: float | None = None
+    mount_run_speed: float | None = Field(
+        default=None, description="Run speed while ridden. The game's 'RideSprintSpeed'."
+    )
+    walk_speed: float | None = Field(
+        default=None, description="Slow/idle walk speed. The game's 'SlowWalkSpeed'."
+    )
+    price: float | None = None
+
+    def is_empty(self) -> bool:
+        return all(value is None for value in self.__dict__.values())
+
+
 class Pal(BaseModel):
     """A single pal.
 
@@ -233,8 +267,12 @@ class Pal(BaseModel):
         default_factory=dict, description="Work suitability levels."
     )
     stats: dict[Stat, float] = Field(
-        default_factory=dict, description="Base stat values where known."
+        default_factory=dict,
+        description="The small subset of base stats a passive can actually target "
+        "(attack, defense, hp, work speed), used for passive scoring. See "
+        "`base_stats` for the full combat/movement stat sheet.",
     )
+    base_stats: PalBaseStats = Field(default_factory=lambda: PalBaseStats())
     innate_passives: tuple[PassiveId, ...] = ()
 
     provenance: Provenance | None = None
