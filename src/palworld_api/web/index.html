@@ -1,0 +1,315 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Palworld Data API</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='14' fill='%232f6df6'/%3E%3Ctext x='16' y='22' font-size='16' text-anchor='middle' fill='white' font-family='sans-serif'%3EP%3C/text%3E%3C/svg%3E">
+<style>
+  :root {
+    --bg: #f6f7f9; --panel: #ffffff; --ink: #14181f; --muted: #5c6673;
+    --line: #dfe3e9; --accent: #2f6df6; --accent-ink: #ffffff;
+    --warn-bg: #fff6e0; --warn-line: #e8c96a; --warn-ink: #6a4e07;
+    --special: #7b3fbf; --radius: 10px;
+  }
+  :root:not([data-theme="light"]) { color-scheme: light; }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #14171c; --panel: #1c2027; --ink: #e8ecf2; --muted: #98a2b1;
+      --line: #2c323c; --accent: #5b8dff; --accent-ink: #0d1117;
+      --warn-bg: #3a2f14; --warn-line: #7a6427; --warn-ink: #f0d79a;
+      --special: #b98cf0; color-scheme: dark;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 24px 16px 64px; background: var(--bg); color: var(--ink);
+    font: 15px/1.55 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  .wrap { max-width: 960px; margin: 0 auto; }
+  h1 { font-size: 1.5rem; margin: 0 0 4px; letter-spacing: -0.01em; }
+  .sub { color: var(--muted); margin: 0 0 20px; font-size: 0.92rem; }
+  .banner {
+    background: var(--warn-bg); border: 1px solid var(--warn-line); color: var(--warn-ink);
+    padding: 10px 14px; border-radius: var(--radius); margin-bottom: 20px; font-size: 0.9rem;
+  }
+  .banner[hidden] { display: none !important; }
+  .tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 16px; }
+  .tab {
+    padding: 7px 14px; border: 1px solid var(--line); background: var(--panel);
+    color: var(--muted); border-radius: 999px; cursor: pointer; font-size: 0.88rem;
+  }
+  .tab[aria-selected="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+  .panel {
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: var(--radius); padding: 18px;
+  }
+  .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; margin-bottom: 14px; }
+  .field { display: flex; flex-direction: column; gap: 4px; flex: 1 1 180px; min-width: 0; }
+  label { font-size: 0.78rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+  input, select {
+    padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px;
+    background: var(--bg); color: var(--ink); font: inherit; width: 100%;
+  }
+  button {
+    padding: 9px 18px; border: 0; border-radius: 8px; background: var(--accent);
+    color: var(--accent-ink); font: inherit; font-weight: 600; cursor: pointer;
+  }
+  button:disabled { opacity: 0.55; cursor: default; }
+  .out { margin-top: 6px; }
+  .empty { color: var(--muted); font-size: 0.9rem; }
+  .err { color: #c0392b; font-size: 0.9rem; }
+  @media (prefers-color-scheme: dark) { .err { color: #ff9b8f; } }
+  .step {
+    display: flex; gap: 12px; align-items: baseline; padding: 9px 0;
+    border-bottom: 1px solid var(--line);
+  }
+  .step:last-child { border-bottom: 0; }
+  .gen {
+    flex: 0 0 auto; font-variant-numeric: tabular-nums; font-size: 0.75rem;
+    color: var(--muted); border: 1px solid var(--line); border-radius: 999px;
+    padding: 1px 8px;
+  }
+  .formula { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.9rem; }
+  .tag {
+    font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em;
+    padding: 1px 7px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted);
+  }
+  .tag.special { color: var(--special); border-color: var(--special); }
+  .meta { color: var(--muted); font-size: 0.85rem; margin-bottom: 10px; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+  th, td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--line); }
+  th { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .scroll { overflow-x: auto; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Palworld Data API</h1>
+  <p class="sub">Consultas de crianza, rutas y pasivas contra la API local.</p>
+
+  <div class="banner" id="banner" hidden></div>
+
+  <div class="tabs" role="tablist">
+    <button class="tab" role="tab" data-view="route" aria-selected="true">Ruta</button>
+    <button class="tab" role="tab" data-view="breed" aria-selected="false">Cruce</button>
+    <button class="tab" role="tab" data-view="passives" aria-selected="false">Pasivas</button>
+    <button class="tab" role="tab" data-view="parents" aria-selected="false">Progenitores</button>
+  </div>
+
+  <div class="panel">
+    <div class="row" id="controls"></div>
+    <div class="out" id="out"><p class="empty">Elige una consulta y pulsa el botón.</p></div>
+  </div>
+</div>
+
+<script>
+const out = document.getElementById("out");
+const controls = document.getElementById("controls");
+let pals = [];
+
+const VIEWS = {
+  route: {
+    fields: [
+      { id: "target", label: "Objetivo", type: "pal" },
+      { id: "owned", label: "Pals que tienes (coma)", type: "text", placeholder: "vacío = todos los capturables" },
+      { id: "strategy", label: "Estrategia", type: "select", options: [["generations", "Generaciones"], ["tree", "Árbol"]] },
+    ],
+    run: runRoute,
+  },
+  breed: {
+    fields: [
+      { id: "parent_a", label: "Progenitor A", type: "pal" },
+      { id: "parent_b", label: "Progenitor B", type: "pal" },
+    ],
+    run: runBreed,
+  },
+  passives: {
+    fields: [
+      { id: "pal", label: "Pal", type: "pal" },
+      { id: "goal", label: "Uso", type: "select", options: [["combat", "Combate"], ["base", "Base"]] },
+    ],
+    run: runPassives,
+  },
+  parents: {
+    fields: [{ id: "pal", label: "Pal", type: "pal" }],
+    run: runParents,
+  },
+};
+
+function render(view) {
+  controls.innerHTML = "";
+  for (const field of VIEWS[view].fields) {
+    const wrap = document.createElement("div");
+    wrap.className = "field";
+    const label = document.createElement("label");
+    label.textContent = field.label;
+    label.htmlFor = "f_" + field.id;
+    wrap.appendChild(label);
+
+    let input;
+    if (field.type === "select") {
+      input = document.createElement("select");
+      for (const [value, text] of field.options) {
+        input.appendChild(new Option(text, value));
+      }
+    } else if (field.type === "pal") {
+      input = document.createElement("select");
+      for (const pal of pals) input.appendChild(new Option(pal.name, pal.id));
+    } else {
+      input = document.createElement("input");
+      input.type = "text";
+      if (field.placeholder) input.placeholder = field.placeholder;
+    }
+    input.id = "f_" + field.id;
+    wrap.appendChild(input);
+    controls.appendChild(wrap);
+  }
+  const holder = document.createElement("div");
+  holder.className = "field";
+  holder.style.flex = "0 0 auto";
+  const button = document.createElement("button");
+  button.textContent = "Consultar";
+  button.onclick = () => VIEWS[view].run().catch(showError);
+  holder.appendChild(button);
+  controls.appendChild(holder);
+  out.innerHTML = '<p class="empty">Elige una consulta y pulsa el botón.</p>';
+}
+
+const value = (id) => document.getElementById("f_" + id).value.trim();
+const nameOf = (id) => (pals.find((p) => p.id === id) || {}).name || id;
+
+function showError(error) {
+  out.innerHTML = "";
+  const p = document.createElement("p");
+  p.className = "err";
+  p.textContent = error.message;
+  out.appendChild(p);
+}
+
+async function api(path) {
+  const response = await fetch(path);
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(body.detail || `HTTP ${response.status}`);
+  return body;
+}
+
+function el(tag, className, text) {
+  const node = document.createElement(tag);
+  if (className) node.className = className;
+  if (text !== undefined) node.textContent = text;
+  return node;
+}
+
+async function runRoute() {
+  const params = new URLSearchParams({ target: value("target"), strategy: value("strategy") });
+  const owned = value("owned");
+  const query = new URLSearchParams({ strategy: value("strategy") });
+  if (owned) for (const o of owned.split(",").map((s) => s.trim()).filter(Boolean)) query.append("owned", o);
+  const data = await api(`/routes/${encodeURIComponent(value("target"))}?${query}`);
+
+  out.innerHTML = "";
+  if (data.already_owned) {
+    out.appendChild(el("p", "empty", "Ya lo tienes: no hace falta criar nada."));
+    return;
+  }
+  out.appendChild(el("p", "meta",
+    `${data.generations} generación(es), ${data.distinct_steps} cruce(s) distintos.`));
+  for (const step of data.steps) {
+    const row = el("div", "step");
+    row.appendChild(el("span", "gen", "G" + step.generation));
+    row.appendChild(el("span", "formula",
+      `${nameOf(step.parent_a)} + ${nameOf(step.parent_b)} → ${nameOf(step.child)}`));
+    if (step.rule === "special") row.appendChild(el("span", "tag special", "combo especial"));
+    else if (step.rule === "same_species") row.appendChild(el("span", "tag", "misma especie"));
+    out.appendChild(row);
+  }
+  if (data.alternatives_for_final_step.length) {
+    out.appendChild(el("p", "meta", "Alternativas para el último paso: " +
+      data.alternatives_for_final_step.map((p) => `${nameOf(p[0])} + ${nameOf(p[1])}`).join(" · ")));
+  }
+}
+
+async function runBreed() {
+  const query = new URLSearchParams({ parent_a: value("parent_a"), parent_b: value("parent_b") });
+  const data = await api(`/breed?${query}`);
+  out.innerHTML = "";
+  const row = el("div", "step");
+  row.appendChild(el("span", "formula",
+    `${nameOf(data.parent_a)} + ${nameOf(data.parent_b)} → ${nameOf(data.child)}`));
+  if (data.rule === "special") row.appendChild(el("span", "tag special", "combo especial"));
+  out.appendChild(row);
+  if (data.target_rank !== null && data.target_rank !== undefined) {
+    out.appendChild(el("p", "meta", `Rango objetivo calculado: ${data.target_rank}`));
+  }
+}
+
+async function runPassives() {
+  const data = await api(
+    `/pals/${encodeURIComponent(value("pal"))}/passives?goal=${encodeURIComponent(value("goal"))}`);
+  out.innerHTML = "";
+  if (!data.passives.length) {
+    out.appendChild(el("p", "empty", "Ninguna pasiva aporta nada para este objetivo."));
+    return;
+  }
+  out.appendChild(el("p", "meta",
+    `Puntuación total ${data.total_score} sobre ${data.considered} pasivas evaluadas.`));
+  const scroll = el("div", "scroll");
+  const table = el("table");
+  table.innerHTML = "<thead><tr><th>Pasiva</th><th>Condición</th><th class='num'>Puntos</th></tr></thead>";
+  const body = el("tbody");
+  for (const passive of data.passives) {
+    const tr = el("tr");
+    tr.appendChild(el("td", null, passive.name));
+    tr.appendChild(el("td", null, passive.condition || "—"));
+    tr.appendChild(el("td", "num", String(passive.score)));
+    body.appendChild(tr);
+  }
+  table.appendChild(body);
+  scroll.appendChild(table);
+  out.appendChild(scroll);
+}
+
+async function runParents() {
+  const data = await api(`/pals/${encodeURIComponent(value("pal"))}/parents`);
+  out.innerHTML = "";
+  if (!data.count) {
+    out.appendChild(el("p", "empty", "Ninguna pareja produce este pal."));
+    return;
+  }
+  out.appendChild(el("p", "meta", `${data.count} pareja(s) lo producen.`));
+  for (const pair of data.pairs.slice(0, 60)) {
+    out.appendChild(el("div", "step",
+      `${nameOf(pair[0])} + ${nameOf(pair[1])}`));
+  }
+  if (data.count > 60) out.appendChild(el("p", "meta", `… y ${data.count - 60} más.`));
+}
+
+for (const tab of document.querySelectorAll(".tab")) {
+  tab.onclick = () => {
+    for (const other of document.querySelectorAll(".tab")) other.setAttribute("aria-selected", "false");
+    tab.setAttribute("aria-selected", "true");
+    render(tab.dataset.view);
+  };
+}
+
+(async function init() {
+  try {
+    const health = await api("/health");
+    const warning = health.data_quality && health.data_quality.warning;
+    if (warning) {
+      const banner = document.getElementById("banner");
+      banner.textContent = warning;
+      banner.hidden = false;
+    }
+    pals = await api("/pals?limit=1000");
+    pals.sort((a, b) => a.name.localeCompare(b.name));
+    render("route");
+  } catch (error) {
+    showError(error);
+  }
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,868 @@
+{
+  "schema_version": 1,
+  "game_version": "demo",
+  "generated_at": "2026-09-13T02:38:53.633144+00:00",
+  "source": "demo",
+  "pals": [
+    {
+      "id": "demo_wooly",
+      "name": "Demo Wooly",
+      "paldeck": "001",
+      "elements": [
+        "neutral"
+      ],
+      "combi_rank": 1470,
+      "wild_obtainable": true,
+      "breedable_as_parent": true,
+      "breedable_as_child": true,
+      "work": {
+        "farming": 1
+      },
+      "stats": {
+        "attack": 53.0,
+        "defense": 58.0,
+        "hp": 155.0
+      },
+      "innate_passives": [],
+      "provenance": {
+        "source": "demo",
+        "confidence": "seed"
+      }
+    },
+    {
+      "id": "demo_sprout",
+      "name": "Demo Sprout",
+      "paldeck": "002",
+      "elements": [
+        "grass"
+      ],
+      "combi_rank": 1380,
+      "wild_obtainable": true,
+      "breedable_as_parent": true,
+      "breedable_as_child": true,
+      "work": {
+        "planting": 1
+      },
+      "stats": {
+        "attack": 62.0,
+        "defense": 65.0,
+        "hp": 170.0
+      },
+      "innate_passives": [],
+      "provenance": {
+        "source": "demo",
+        "confidence": "seed"
+      }
+    },
+    {
+      "id": "demo_ember",
+      "name": "Demo Ember",
+      "paldeck": "003",
+      "elements": [
+        "fire"
+      ],
+      "combi_rank": 1290,
+      "wild_obtainable": true,
+      "breedable_as_parent": true,
+      "breedable_as_child": true,
+      "work": {
+        "kindling": 1
+      },
+      "stats": {
+        "attack": 71.0,
+        "defense": 73.0,
+        "hp": 185.0
+      },
+      "innate_passives": [],
+      "provenance": {
+        "source": "demo",
+        "confidence": "seed"
+      }
+    },
+    {
+      "id": "demo_pebble",
+      "name": "Demo Pebble",
+      "paldeck": "004",
+      "elements": [
+        "ground"
+      ],
+      "combi_rank": 1180,
+      "wild_obtainable": true,
+      "breedable_as_parent": true,
+      "breedable_as_child": true,
+      "work": {
+        "mining": 1
+      },
+      "stats": {
+        "attack": 82.0,
+        "defense": 82.0,
+        "hp": 204.0
+      },
+      "innate_passives": [],
+      "provenance": {
+        "source": "demo",
+        "confidence": "seed"
+      }
+    },
+    {
+      "id": "demo_drip",
+      "name": "Demo Drip",
+      "paldeck": "005",
+      "elements": [
+        "water"
+      ],
+      "combi_rank": 1090,
+      "wild_obtainable": true,
+      "breedable_as_parent": true,
+      "breedable_as_child": true,
+      "work": {
+        "watering": 2
+      },
+      "stats": {
+        "attack": 91.0,
+        "defense": 90.0,
+        "hp": 219.0
+      },
+      "innate_passives": [],
+      "provenance": {
+        "source": "demo",
+        "confidence": "seed"
+      }
+    },
+    {
+      "id": "demo_spark",
+      "name": "Demo Spark",
+      "paldeck": "006",
+      "elements": [
+        "electric"
+      ],
+      "combi_rank": 980,
+      "wild_obtainable": true,
+      "breedable_as_parent": true,
+      "breedable_as_child": true,
+      "work": {
+        "generating_electricity": 1
+      },
+      "stats": {
+        "attack": 102.0,
+        "defense": 99.0,
+        "hp": 237.0
+      },
+      "innate_passives": [],
+      "provenance": {
+        "source": "demo",
+        "confidence": "seed"
+      }
+    },
+    {
+      "id": "demo_frost",
+      "name": "Demo Frost",
+      "paldeck": "007",
+      "elements": [
+        "ice"
+      ],
+      "combi_rank": 870,
+      "wild_obtainable": true,
+      "breedable_as_parent": true,
+      "breedable_as_child": true,
+      "work": {
+        "cooling": 2
+      },
+      "stats": {
+        "attack": 113.0,
+        "defense": 108.0,
+        "hp": 255.0
+      },
+      "innate_passives": [],
+      "provenance": {
+        "source": "demo",
+        "confidence": "seed"
+      }
+    },
+    {
+      "id": "demo_timber",
+      "name": "Demo Timber",
+      "paldeck": "008",
+      "elements": [
+        "grass"
+      ],
+      "combi_rank": 760,
+      "wild_obtainable": true,
+      "breedable_as_parent": true,
+      "breedable_as_child": true,
+      "work": {
+        "lumbering": 3
+      },
+      "stats": {
+        "attack": 124.0,
+        "defense": 117.0,
+        "hp": 274.0
+      },
+      "innate_passives": [],
+      "provenance": {
+        "source": "demo",
+        "confidence": "seed"
+      }
+    },
+    {
+      "id": "demo_tinker",
+      "name": "Demo Tinker",
+      "paldeck": "009",
+      "elements": [
+        "neutral"
+      ],
+      "combi_rank": 650,
+      "wild_obtainable": true,
+      "breedable_as_parent": true,
+      "breedable_as_child": true,
+      "work": {
+        "handiwork": 3
+      },
+      "stats": {
+        "attack": 135.0,
+        "defense": 126.0,
+        "hp": 292.0
+      },
+      "innate_passives": [],
+      "provenance": {
+        "source": "demo",
+        "confidence": "seed"
+      }
+    },
+    {
+      "id": "demo_hauler",
+      "name": "Demo Hauler",
+      "paldeck": "010",
+      "elements": [
+        "ground"
+      ],
+      "combi_rank": 540,
+      "wild_obtainable": true,
+      "breedable_as_parent": true,
+      "breedable_as_child": true,
+      "work": {
+        "transporting": 3
+      },
+      "stats": {
+        "attack": 146.0,
+        "defense": 135.0,
+        "hp": 310.0
+      },
+      "innate_passives": [],
+      "provenance": {
+        "source": "demo",
+        "confidence": "seed"
+      }
+    },
+    {
+      "id": "demo_medic",
+      "name": "Demo Medic",
+      "paldeck": "011",
+      "elements": [
+        "water"
+      ],
+      "combi_rank": 470,
+      "wild_obtainable": true,
+      "breedable_as_parent": true,
+      "breedable_as_child": true,
+      "work": {
+        "medicine_production": 3
+      },
+      "stats": {
+        "attack": 153.0,
+        "defense": 141.0,
+        "hp": 322.0
+      },
+      "innate_passives": [],
+      "provenance": {
+        "source": "demo",
+        "confidence": "seed"
+      }
+    },
+    {
+      "id": "demo_forge",
+      "name": "Demo Forge",
+      "paldeck": "012",
+      "elements": [
+        "fire"
+      ],
+      "combi_rank": 400,
+      "wild_obtainable": true,
+      "breedable_as_parent": true,
+      "breedable_as_child": true,
+      "work": {
+        "kindling": 4,
+        "mining": 2
+      },
+      "stats": {
+        "attack": 160.0,
+        "defense": 147.0,
+        "hp": 334.0
+      },
+      "innate_passives": [],
+      "provenance": {
+        "source": "demo",
+        "confidence": "seed"
+      }
+    },
+    {
+      "id": "demo_gale",
+      "name": "Demo Gale",
+      "paldeck": "013",
+      "elements": [
+        "neutral"
+      ],
+      "combi_rank": 330,
+      "wild_obtainable": true,
+      "breedable_as_parent": true,
+      "breedable_as_child": true,
+      "work": {
+        "gathering": 3
+      },
+      "stats": {
+        "attack": 167.0,
+        "defense": 153.0,
+        "hp": 345.0
+      },
+      "innate_passives": [],
+      "provenance": {
+        "source": "demo",
+        "confidence": "seed"
+      }
+    },
+    {
+      "id": "demo_shade",
+      "name": "Demo Shade",
+      "paldeck": "014",
+      "elements": [
+        "dark"
+      ],
+      "combi_rank": 270,
+      "wild_obtainable": true,
+      "breedable_as_parent": true,
+      "breedable_as_child": true,
+      "work": {
+        "handiwork": 2
+      },
+      "stats": {
+        "attack": 173.0,
+        "defense": 158.0,
+        "hp": 355.0
+      },
+      "innate_passives": [],
+      "provenance": {
+        "source": "demo",
+        "confidence": "seed"
+      }
+    },
+    {
+      "id": "demo_glacier",
+      "name": "Demo Glacier",
+      "paldeck": "015",
+      "elements": [
+        "ice"
+      ],
+      "combi_rank": 210,
+      "wild_obtainable": true,
+      "breedable_as_parent": true,
+      "breedable_as_child": true,
+      "work": {
+        "cooling": 4
+      },
+      "stats": {
+        "attack": 179.0,
+        "defense": 163.0,
+        "hp": 365.0
+      },
+      "innate_passives": [],
+      "provenance": {
+        "source": "demo",
+        "confidence": "seed"
+      }
+    },
+    {
+      "id": "demo_volt",
+      "name": "Demo Volt",
+      "paldeck": "016",
+      "elements": [
+        "electric"
+      ],
+      "combi_rank": 160,
+      "wild_obtainable": true,
+      "breedable_as_parent": true,
+      "breedable_as_child": true,
+      "work": {
+        "generating_electricity": 4
+      },
+      "stats": {
+        "attack": 184.0,
+        "defense": 167.0,
+        "hp": 374.0
+      },
+      "innate_passives": [],
+      "provenance": {
+        "source": "demo",
+        "confidence": "seed"
+      }
+    },
+    {
+      "id": "demo_titan",
+      "name": "Demo Titan",
+      "paldeck": "017",
+      "elements": [
+        "ground"
+      ],
+      "combi_rank": 120,
+      "wild_obtainable": true,
+      "breedable_as_parent": true,
+      "breedable_as_child": true,
+      "work": {
+        "mining": 4
+      },
+      "stats": {
+        "attack": 188.0,
+        "defense": 170.0,
+        "hp": 380.0
+      },
+      "innate_passives": [],
+      "provenance": {
+        "source": "demo",
+        "confidence": "seed"
+      }
+    },
+    {
+      "id": "demo_wyrm",
+      "name": "Demo Wyrm",
+      "paldeck": "018",
+      "elements": [
+        "dragon"
+      ],
+      "combi_rank": 90,
+      "wild_obtainable": false,
+      "breedable_as_parent": true,
+      "breedable_as_child": true,
+      "work": {
+        "handiwork": 4
+      },
+      "stats": {
+        "attack": 191.0,
+        "defense": 173.0,
+        "hp": 385.0
+      },
+      "innate_passives": [],
+      "provenance": {
+        "source": "demo",
+        "confidence": "seed"
+      }
+    },
+    {
+      "id": "demo_phoenix",
+      "name": "Demo Phoenix",
+      "paldeck": "019",
+      "elements": [
+        "fire"
+      ],
+      "combi_rank": 60,
+      "wild_obtainable": false,
+      "breedable_as_parent": true,
+      "breedable_as_child": true,
+      "work": {
+        "kindling": 5
+      },
+      "stats": {
+        "attack": 194.0,
+        "defense": 175.0,
+        "hp": 390.0
+      },
+      "innate_passives": [],
+      "provenance": {
+        "source": "demo",
+        "confidence": "seed"
+      }
+    },
+    {
+      "id": "demo_warden",
+      "name": "Demo Warden",
+      "paldeck": "020",
+      "elements": [
+        "dark",
+        "ground"
+      ],
+      "combi_rank": 40,
+      "wild_obtainable": false,
+      "breedable_as_parent": true,
+      "breedable_as_child": true,
+      "work": {
+        "handiwork": 5
+      },
+      "stats": {
+        "attack": 196.0,
+        "defense": 177.0,
+        "hp": 394.0
+      },
+      "innate_passives": [],
+      "provenance": {
+        "source": "demo",
+        "confidence": "seed"
+      }
+    },
+    {
+      "id": "demo_sovereign",
+      "name": "Demo Sovereign",
+      "paldeck": "021",
+      "elements": [
+        "dragon",
+        "dark"
+      ],
+      "combi_rank": 20,
+      "wild_obtainable": false,
+      "breedable_as_parent": true,
+      "breedable_as_child": true,
+      "work": {
+        "handiwork": 5
+      },
+      "stats": {
+        "attack": 198.0,
+        "defense": 179.0,
+        "hp": 397.0
+      },
+      "innate_passives": [],
+      "provenance": {
+        "source": "demo",
+        "confidence": "seed"
+      }
+    }
+  ],
+  "passives": [
+    {
+      "id": "demo_ferocious",
+      "name": "Demo Ferocious",
+      "tier": 2,
+      "effects": [
+        {
+          "stat": "attack",
+          "value": 20.0
+        }
+      ],
+      "exclusive_group": "attack",
+      "restricted_to": [],
+      "heritable": true,
+      "provenance": {
+        "source": "demo",
+        "confidence": "seed"
+      }
+    },
+    {
+      "id": "demo_bold",
+      "name": "Demo Bold",
+      "tier": 1,
+      "effects": [
+        {
+          "stat": "attack",
+          "value": 10.0
+        }
+      ],
+      "exclusive_group": "attack",
+      "restricted_to": [],
+      "heritable": true,
+      "provenance": {
+        "source": "demo",
+        "confidence": "seed"
+      }
+    },
+    {
+      "id": "demo_legend",
+      "name": "Demo Legend",
+      "tier": 3,
+      "effects": [
+        {
+          "stat": "attack",
+          "value": 20.0
+        },
+        {
+          "stat": "defense",
+          "value": 20.0
+        },
+        {
+          "stat": "movement_speed",
+          "value": 15.0
+        }
+      ],
+      "restricted_to": [],
+      "heritable": true,
+      "provenance": {
+        "source": "demo",
+        "confidence": "seed"
+      }
+    },
+    {
+      "id": "demo_stalwart",
+      "name": "Demo Stalwart",
+      "tier": 2,
+      "effects": [
+        {
+          "stat": "defense",
+          "value": 20.0
+        }
+      ],
+      "exclusive_group": "defense",
+      "restricted_to": [],
+      "heritable": true,
+      "provenance": {
+        "source": "demo",
+        "confidence": "seed"
+      }
+    },
+    {
+      "id": "demo_sturdy",
+      "name": "Demo Sturdy",
+      "tier": 1,
+      "effects": [
+        {
+          "stat": "defense",
+          "value": 10.0
+        }
+      ],
+      "exclusive_group": "defense",
+      "restricted_to": [],
+      "heritable": true,
+      "provenance": {
+        "source": "demo",
+        "confidence": "seed"
+      }
+    },
+    {
+      "id": "demo_artisan",
+      "name": "Demo Artisan",
+      "tier": 2,
+      "effects": [
+        {
+          "stat": "work_speed",
+          "value": 50.0
+        }
+      ],
+      "exclusive_group": "work_speed",
+      "restricted_to": [],
+      "heritable": true,
+      "provenance": {
+        "source": "demo",
+        "confidence": "seed"
+      }
+    },
+    {
+      "id": "demo_diligent",
+      "name": "Demo Diligent",
+      "tier": 1,
+      "effects": [
+        {
+          "stat": "work_speed",
+          "value": 25.0
+        }
+      ],
+      "exclusive_group": "work_speed",
+      "restricted_to": [],
+      "heritable": true,
+      "provenance": {
+        "source": "demo",
+        "confidence": "seed"
+      }
+    },
+    {
+      "id": "demo_serene",
+      "name": "Demo Serene",
+      "tier": 2,
+      "effects": [
+        {
+          "stat": "sanity_loss",
+          "value": -15.0
+        }
+      ],
+      "exclusive_group": "sanity",
+      "restricted_to": [],
+      "heritable": true,
+      "provenance": {
+        "source": "demo",
+        "confidence": "seed"
+      }
+    },
+    {
+      "id": "demo_calm",
+      "name": "Demo Calm",
+      "tier": 1,
+      "effects": [
+        {
+          "stat": "sanity_loss",
+          "value": -10.0
+        }
+      ],
+      "exclusive_group": "sanity",
+      "restricted_to": [],
+      "heritable": true,
+      "provenance": {
+        "source": "demo",
+        "confidence": "seed"
+      }
+    },
+    {
+      "id": "demo_light_eater",
+      "name": "Demo Light Eater",
+      "tier": 2,
+      "effects": [
+        {
+          "stat": "hunger_loss",
+          "value": -15.0
+        }
+      ],
+      "restricted_to": [],
+      "heritable": true,
+      "provenance": {
+        "source": "demo",
+        "confidence": "seed"
+      }
+    },
+    {
+      "id": "demo_swift",
+      "name": "Demo Swift",
+      "tier": 1,
+      "effects": [
+        {
+          "stat": "movement_speed",
+          "value": 30.0
+        }
+      ],
+      "restricted_to": [],
+      "heritable": true,
+      "provenance": {
+        "source": "demo",
+        "confidence": "seed"
+      }
+    },
+    {
+      "id": "demo_nightstalker",
+      "name": "Demo Nightstalker",
+      "tier": 2,
+      "effects": [
+        {
+          "stat": "attack",
+          "value": 30.0
+        }
+      ],
+      "condition": "night",
+      "restricted_to": [],
+      "heritable": true,
+      "provenance": {
+        "source": "demo",
+        "confidence": "seed"
+      }
+    },
+    {
+      "id": "demo_dragonheart",
+      "name": "Demo Dragonheart",
+      "tier": 2,
+      "effects": [
+        {
+          "stat": "element_damage",
+          "value": 20.0,
+          "element": "dragon"
+        }
+      ],
+      "restricted_to": [],
+      "heritable": true,
+      "provenance": {
+        "source": "demo",
+        "confidence": "seed"
+      }
+    },
+    {
+      "id": "demo_burdened",
+      "name": "Demo Burdened",
+      "tier": -1,
+      "effects": [
+        {
+          "stat": "work_speed",
+          "value": -30.0
+        }
+      ],
+      "restricted_to": [],
+      "heritable": true,
+      "provenance": {
+        "source": "demo",
+        "confidence": "seed"
+      }
+    },
+    {
+      "id": "demo_brittle",
+      "name": "Demo Brittle",
+      "tier": -2,
+      "effects": [
+        {
+          "stat": "defense",
+          "value": -20.0
+        }
+      ],
+      "restricted_to": [],
+      "heritable": true,
+      "provenance": {
+        "source": "demo",
+        "confidence": "seed"
+      }
+    },
+    {
+      "id": "demo_crown",
+      "name": "Demo Crown",
+      "tier": 3,
+      "effects": [
+        {
+          "stat": "attack",
+          "value": 40.0
+        }
+      ],
+      "restricted_to": [
+        "demo_sovereign"
+      ],
+      "heritable": false,
+      "provenance": {
+        "source": "demo",
+        "confidence": "seed"
+      }
+    }
+  ],
+  "special_combos": [
+    {
+      "parents": [
+        "demo_wyrm",
+        "demo_phoenix"
+      ],
+      "child": "demo_sovereign",
+      "provenance": {
+        "source": "demo",
+        "confidence": "seed"
+      }
+    },
+    {
+      "parents": [
+        "demo_titan",
+        "demo_shade"
+      ],
+      "child": "demo_warden",
+      "provenance": {
+        "source": "demo",
+        "confidence": "seed"
+      }
+    }
+  ],
+  "inheritance": {
+    "inherited_count_weights": [
+      0.4,
+      0.3,
+      0.2,
+      0.1
+    ],
+    "random_slot_chance": 0.0,
+    "max_passive_slots": 4,
+    "provenance": {
+      "source": "demo",
+      "confidence": "seed"
+    }
+  }
+}

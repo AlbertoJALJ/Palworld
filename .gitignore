@@ -1,0 +1,16 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Scraped HTML cache: large, regenerable, and not ours to redistribute.
+data/cache/
+# Generated datasets. data/demo.json is committed as a working example.
+data/pals.json
