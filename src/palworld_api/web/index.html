@@ -435,20 +435,24 @@ const ELEMENT_ICONS = {
   dragon: { view: 24, stroke: '<path d="M4 20 10 6M9 20 15 6M14 20 20 6"/>' },
 };
 
+// Concepts (not artwork) matched to the game's own names for these work
+// suitabilities -- e.g. Handiwork is an open hand, not a tool, and Farming
+// here means livestock ranching, not crop planting (that's Planting).
+// Deliberately original, geometric line icons throughout; see the README.
 const WORK_ICONS = {
   kindling: ELEMENT_ICONS.fire,
-  watering: ELEMENT_ICONS.water,
   generating_electricity: ELEMENT_ICONS.electric,
   cooling: ELEMENT_ICONS.ice,
-  planting: { view: 24, stroke: '<path d="M12 21V9"/><path d="M12 9C12 5 8 3 4 4c1 4 4 6 8 5z"/><path d="M12 9c0-4 4-6 8-5-1 4-4 6-8 5z"/>' },
-  handiwork: { view: 24, stroke: '<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.8-3.8a6 6 0 0 1-7.9 7.9l-6.9 6.9a2.1 2.1 0 1 1-3-3l6.9-6.9a6 6 0 0 1 7.9-7.9z"/>' },
-  gathering: { view: 24, stroke: '<path d="M4 10h16l-2 10H6z"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/>' },
+  watering: { view: 24, stroke: '<ellipse cx="10" cy="14" rx="7" ry="5"/><path d="M17 12l4 1-1 2.5z"/><path d="M4 12c-2 0-2 5 0 5"/><circle cx="10" cy="8" r="1.2"/>' },
+  planting: { view: 24, stroke: '<path d="M12 21v-9"/><circle cx="12" cy="8.3" r="2.3"/><circle cx="9" cy="10.6" r="2.3"/><circle cx="15" cy="10.6" r="2.3"/>' },
+  handiwork: { view: 24, stroke: '<path d="M7 21v-6.5M10 21v-8.5M13 21v-9.5M16 21v-7.5"/><path d="M7 14.5c-1.5-1-3 .5-1.5 2l2 2.5c1 1.5 2.5 2 4.5 2h2c2.5 0 4-1.5 4-4v-6"/>' },
+  gathering: { view: 24, stroke: '<path d="M12 21C6 21 4 15 4 10c6 0 10 2 10 11z"/><path d="M12 21c0-6 2-10 7-13"/>' },
   lumbering: { view: 24, stroke: '<path d="M6 21 14 13"/><path d="M12 6l7 3-3 7z"/>' },
   mining: { view: 24, stroke: '<path d="M4 20 14 6M20 20 10 6"/>' },
-  medicine_production: { view: 24, stroke: '<circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/>' },
-  transporting: { view: 24, stroke: '<rect x="3" y="7" width="13" height="9" rx="1"/><path d="M16 10h3l2 3v3h-5z"/><circle cx="7.5" cy="18.5" r="1.5"/><circle cx="16.5" cy="18.5" r="1.5"/>' },
-  farming: { view: 24, stroke: '<path d="M12 21V4"/><path d="M12 6l-3-2M12 6l3-2M12 10l-3-2M12 10l3-2M12 14l-3-2M12 14l3-2"/>' },
+  medicine_production: { view: 24, stroke: '<path d="M5 13a7 4 0 0 0 14 0"/><path d="M4 13h16"/><path d="M10 13c0-3 1-5 3-6.5"/><path d="M15 5l2.5 2.5"/><circle cx="16.5" cy="4" r="1.2"/>' },
   oil_extraction: { view: 24, stroke: '<rect x="6" y="4" width="12" height="16" rx="2"/><path d="M6 9.5h12M6 14.5h12"/>' },
+  transporting: { view: 24, stroke: '<path d="M4 8l8-4 8 4-8 4z"/><path d="M4 8v8l8 4 8-4V8"/><path d="M12 12v9"/>' },
+  farming: { view: 24, stroke: '<path d="M4 20V9M9 20V6M14 20V9M19 20V6"/><path d="M2 12h20M2 16h20"/>' },
 };
 
 function iconSvg(spec) {
