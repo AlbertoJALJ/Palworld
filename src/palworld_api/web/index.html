@@ -253,6 +253,7 @@ const I18N = {
     consult: "Consultar",
     searchPalPlaceholder: "Buscar pal…", searchPalLabel: "Buscar pal",
     noResults: "Sin resultados.", noPalsAvailable: "Sin pals disponibles",
+    typeToSeeMore: (n) => `... y ${n} más. Escribe para buscar.`,
     chooseAndRun: "Elige una consulta y pulsa el botón.",
     specialCombo: "combo especial", sameSpecies: "misma especie",
     genderMale: "macho", genderFemale: "hembra",
@@ -310,6 +311,7 @@ const I18N = {
     consult: "Query",
     searchPalPlaceholder: "Search pal…", searchPalLabel: "Search pal",
     noResults: "No results.", noPalsAvailable: "No pals available",
+    typeToSeeMore: (n) => `... and ${n} more. Type to search.`,
     chooseAndRun: "Pick a query and press the button.",
     specialCombo: "special combo", sameSpecies: "same species",
     genderMale: "male", genderFemale: "female",
@@ -549,14 +551,18 @@ function createPalPicker(wrap, fieldId) {
   function renderRows(filterText) {
     list.innerHTML = "";
     const needle = filterText.trim().toLowerCase();
-    const matches = needle
-      ? pals.filter((p) => p.name.toLowerCase().includes(needle))
-      : pals;
+    const matches = needle ? pals.filter((p) => p.name.toLowerCase().includes(needle)) : pals;
     if (!matches.length) {
       list.appendChild(el("div", "picker-empty", t("noResults")));
       return;
     }
-    for (const pal of matches.slice(0, 300)) {
+    // With no search text, opening the picker would otherwise render every
+    // pal (and request every pal's icon) at once -- fine on a fast local
+    // connection, painfully slow over a phone's Wi-Fi hop to a dev server.
+    // A search narrows this on its own, so only the empty-query case is capped.
+    const cap = needle ? 300 : 40;
+    const shown = matches.slice(0, cap);
+    for (const pal of shown) {
       const row = el("div", "picker-row");
       row.setAttribute("role", "option");
       if (pal.id === hidden.value) row.setAttribute("aria-selected", "true");
@@ -564,6 +570,9 @@ function createPalPicker(wrap, fieldId) {
       row.appendChild(el("span", "name", pal.name));
       row.onclick = () => selectPal(pal);
       list.appendChild(row);
+    }
+    if (matches.length > shown.length) {
+      list.appendChild(el("div", "picker-empty", t("typeToSeeMore")(matches.length - shown.length)));
     }
   }
 
