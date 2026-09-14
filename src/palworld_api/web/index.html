@@ -254,6 +254,8 @@ const I18N = {
     searchPalPlaceholder: "Buscar pal…", searchPalLabel: "Buscar pal",
     noResults: "Sin resultados.", noPalsAvailable: "Sin pals disponibles",
     typeToSeeMore: (n) => `... y ${n} más. Escribe para buscar.`,
+    requestTimedOut: "Sin respuesta del servidor tras 15s. Revisa la conexión e inténtalo de nuevo.",
+    networkError: "No se pudo conectar con el servidor. Revisa la conexión e inténtalo de nuevo.",
     chooseAndRun: "Elige una consulta y pulsa el botón.",
     specialCombo: "combo especial", sameSpecies: "misma especie",
     genderMale: "macho", genderFemale: "hembra",
@@ -312,6 +314,8 @@ const I18N = {
     searchPalPlaceholder: "Search pal…", searchPalLabel: "Search pal",
     noResults: "No results.", noPalsAvailable: "No pals available",
     typeToSeeMore: (n) => `... and ${n} more. Type to search.`,
+    requestTimedOut: "No response from the server after 15s. Check your connection and try again.",
+    networkError: "Could not reach the server. Check your connection and try again.",
     chooseAndRun: "Pick a query and press the button.",
     specialCombo: "special combo", sameSpecies: "same species",
     genderMale: "male", genderFemale: "female",
@@ -472,6 +476,13 @@ function typeIcon(name, kind, className) {
   return span;
 }
 
+function placeholderIcon(pal, className) {
+  const badge = el("div", className + " placeholder");
+  badge.style.background = ELEMENT_COLORS[(pal && pal.elements && pal.elements[0]) || "neutral"];
+  badge.textContent = pal ? pal.name.charAt(0) : "?";
+  return badge;
+}
+
 function palIcon(pal, size) {
   const className = size === "small" ? "pal-icon small" : size === "large" ? "detail-icon" : "pal-icon";
   if (pal && pal.icon) {
@@ -480,12 +491,16 @@ function palIcon(pal, size) {
     img.src = pal.icon;
     img.alt = "";
     img.loading = "lazy";
+    // A request that drops on a flaky connection leaves a permanently broken
+    // image with nothing on screen explaining it; fall back to the same
+    // placeholder a pal with no icon at all would get, in place, once.
+    img.onerror = () => {
+      img.onerror = null;
+      img.replaceWith(placeholderIcon(pal, className));
+    };
     return img;
   }
-  const badge = el("div", className + " placeholder");
-  badge.style.background = ELEMENT_COLORS[(pal && pal.elements && pal.elements[0]) || "neutral"];
-  badge.textContent = pal ? pal.name.charAt(0) : "?";
-  return badge;
+  return placeholderIcon(pal, className);
 }
 
 const palById = (id) => pals.find((p) => p.id === id);
@@ -689,7 +704,23 @@ function showError(error) {
 
 async function api(path) {
   const url = path + (path.includes("?") ? "&" : "?") + `lang=${LANG}`;
-  const response = await fetch(url);
+  // Plain fetch() has no timeout of its own -- on a flaky connection (a
+  // phone's Wi-Fi hop to this dev server, say) a stalled request would
+  // otherwise hang indefinitely with nothing on screen to explain why,
+  // indistinguishable from the app simply not responding to the click.
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 15000);
+  let response;
+  try {
+    response = await fetch(url, { signal: controller.signal });
+  } catch (error) {
+    if (error.name === "AbortError") {
+      throw new Error(t("requestTimedOut"));
+    }
+    throw new Error(t("networkError"));
+  } finally {
+    clearTimeout(timeout);
+  }
   const body = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(body.detail || `HTTP ${response.status}`);
   return body;
