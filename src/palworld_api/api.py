@@ -149,7 +149,6 @@ class RouteResponse(BaseModel):
     strategy: str
     generations: int
     distinct_steps: int
-    already_owned: bool
     steps: list[RouteStepResponse]
     intermediates: list[str]
     alternatives_for_final_step: list[list[str]]
@@ -411,10 +410,29 @@ def route(
     except RouteError as exc:
         message = str(exc)
         status = 404 if "unknown pal" in message else 422
+        if "not reachable" in message:
+            # Two different reasons this happens, worth telling apart rather
+            # than leaving both as an unexplained "not reachable": a pal with
+            # no producing pair at all is a real dataset gap, while one whose
+            # only producing pairs all need itself as a parent (a legendary
+            # bred only into variants of itself, say) has no recipe reachable
+            # from anything else, ever -- by game design, not by omission.
+            resolved = services.index.resolve(target)
+            if resolved is not None:
+                pairs = services.breeding.pairs_producing(resolved.id)
+                needs_itself = pairs and all(resolved.id in pair for pair in pairs)
+                if needs_itself and resolved.wild_obtainable:
+                    message += (
+                        ". Every pair that produces it needs one of it as a "
+                        "parent already; it can only be caught, not bred "
+                        "from other species."
+                    )
+                elif not pairs:
+                    message += ". No pair in this dataset produces it at all."
         raise HTTPException(status_code=status, detail=message) from exc
 
     alternatives: list[list[str]] = []
-    if include_alternatives and not plan.already_owned:
+    if include_alternatives:
         alternatives = [
             list(pair) for pair in services.planner.alternatives(plan.target, owned)
         ]
@@ -424,7 +442,6 @@ def route(
         strategy=plan.strategy.value,
         generations=plan.generations,
         distinct_steps=plan.distinct_steps,
-        already_owned=plan.already_owned,
         steps=[
             RouteStepResponse(
                 generation=s.generation,

@@ -62,7 +62,6 @@ class RoutePlan:
     generations: int
     distinct_steps: int
     intermediates: tuple[str, ...] = ()
-    already_owned: bool = False
 
     @property
     def is_empty(self) -> bool:
@@ -119,26 +118,27 @@ class RoutePlanner:
 
         owned_ids = self._resolve_owned(owned)
 
-        if target_id in owned_ids:
-            return RoutePlan(
-                target=target_id,
-                steps=(),
-                strategy=strategy,
-                owned=tuple(sorted(owned_ids)),
-                generations=0,
-                distinct_steps=0,
-                already_owned=True,
+        # Whether the target happens to already be obtainable -- explicitly
+        # listed, or (the common case) swept in by the "everything catchable"
+        # default -- is not this tool's business. A route planner answers
+        # "how would I breed this", and that answer does not change just
+        # because you could also go catch one; always look for a real recipe.
+        search_ids = owned_ids - {target_id}
+        if not search_ids:
+            raise RouteError(
+                f"{target_id!r} is the only pal given -- add at least one "
+                f"other pal to breed it from"
             )
 
         best, via, _ = self._search(
-            owned_ids, strategy, max_generations, target_id=target_id
+            search_ids, strategy, max_generations, target_id=target_id
         )
         if target_id not in best:
             raise RouteError(
                 f"{target_id!r} is not reachable by breeding from the given pals"
             )
 
-        steps = self._reconstruct(target_id, via, owned_ids)
+        steps = self._reconstruct(target_id, via, search_ids)
         generations = max((s.generation for s in steps), default=0)
         intermediates = tuple(
             s.child for s in steps if s.child != target_id
@@ -147,7 +147,7 @@ class RoutePlanner:
             target=target_id,
             steps=steps,
             strategy=strategy,
-            owned=tuple(sorted(owned_ids)),
+            owned=tuple(sorted(search_ids)),
             generations=generations,
             distinct_steps=len(steps),
             intermediates=intermediates,

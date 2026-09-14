@@ -155,10 +155,21 @@ def test_route_generation_cap_is_enforced(client: TestClient) -> None:
     assert client.get("/routes/demo_sovereign?max_generations=1").status_code == 422
 
 
-def test_owning_the_target_short_circuits(client: TestClient) -> None:
-    body = client.get("/routes/demo_sovereign?owned=demo_sovereign").json()
-    assert body["already_owned"] is True
-    assert body["steps"] == []
+def test_owning_the_target_alone_is_a_422(client: TestClient) -> None:
+    # Whether you already have the target is irrelevant to this endpoint: it
+    # always tries to find an actual recipe, so giving it nothing else to
+    # breed from is a real error, not a free pass to "0 steps needed".
+    response = client.get("/routes/demo_sovereign?owned=demo_sovereign")
+    assert response.status_code == 422
+    assert "only pal given" in response.json()["detail"]
+
+
+def test_owning_the_target_does_not_suppress_a_real_recipe(client: TestClient) -> None:
+    body = client.get(
+        "/routes/demo_sovereign?owned=demo_sovereign&owned=demo_wyrm&owned=demo_phoenix"
+    ).json()
+    assert body["steps"]
+    assert body["steps"][-1]["child"] == "demo_sovereign"
 
 
 def test_parents_and_children_are_consistent(client: TestClient) -> None:

@@ -22,11 +22,25 @@ def _assert_well_ordered(plan, planner: RoutePlanner) -> None:
         assert plan.target in have
 
 
-def test_owning_the_target_needs_no_steps(planner: RoutePlanner) -> None:
-    plan = planner.plan("apex", owned=["apex"])
-    assert plan.already_owned is True
-    assert plan.steps == ()
-    assert plan.generations == 0
+def test_owning_the_target_alone_is_not_enough_to_breed_it(planner: RoutePlanner) -> None:
+    # Whether you already have the target is irrelevant to this tool: it
+    # always tries to find an actual recipe, so giving it nothing else to
+    # breed from is a real error, not a free pass.
+    with pytest.raises(RouteError, match="is the only pal given"):
+        planner.plan("apex", owned=["apex"])
+
+
+def test_owning_the_target_does_not_short_circuit_a_real_recipe(
+    planner: RoutePlanner,
+) -> None:
+    # p100 is wild-obtainable (so a plausible member of "owned"), and also
+    # breedable from p50 + p200. Listing it as owned alongside real breeding
+    # stock must not suppress the recipe -- ownership is not this tool's
+    # business, a recipe is.
+    plan = planner.plan("p100", owned=["p100", "p50", "p200"])
+    assert plan.steps
+    assert plan.steps[-1].child == "p100"
+    _assert_well_ordered(plan, planner)
 
 
 def test_single_step_route(planner: RoutePlanner) -> None:
@@ -72,7 +86,19 @@ def test_tree_strategy_never_beats_generation_count(planner: RoutePlanner) -> No
 def test_default_owned_excludes_non_wild_pals(planner: RoutePlanner) -> None:
     assert "apex" not in planner.default_owned()
     plan = planner.plan("apex")
-    assert not plan.already_owned
+    assert plan.steps
+    _assert_well_ordered(plan, planner)
+
+
+def test_default_owned_still_finds_a_recipe_for_a_wild_target(
+    planner: RoutePlanner,
+) -> None:
+    # p100 IS in the default owned set (wild-obtainable); planning a route to
+    # it must not come back empty just because you could also go catch one.
+    assert "p100" in planner.default_owned()
+    plan = planner.plan("p100")
+    assert plan.steps
+    assert plan.steps[-1].child == "p100"
     _assert_well_ordered(plan, planner)
 
 

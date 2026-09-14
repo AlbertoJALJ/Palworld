@@ -259,8 +259,6 @@ const I18N = {
     chooseAndRun: "Elige una consulta y pulsa el botón.",
     specialCombo: "combo especial", sameSpecies: "misma especie",
     genderMale: "macho", genderFemale: "hembra",
-    alreadyOwned: "Ya lo tienes: no hace falta criar nada.",
-    alsoBredFrom: "Aun así, estas parejas también lo producirían:",
     routeSummary: (g, s) => `${g} generación(es), ${s} cruce(s) distintos.`,
     routeAlternatives: "Alternativas para el último paso: ",
     breedRequires: "Requiere: ",
@@ -320,8 +318,6 @@ const I18N = {
     chooseAndRun: "Pick a query and press the button.",
     specialCombo: "special combo", sameSpecies: "same species",
     genderMale: "male", genderFemale: "female",
-    alreadyOwned: "You already have it: no breeding needed.",
-    alsoBredFrom: "It can also be bred from these pairs:",
     routeSummary: (g, s) => `${g} generation(s), ${s} distinct cross(es).`,
     routeAlternatives: "Alternatives for the final step: ",
     breedRequires: "Requires: ",
@@ -757,27 +753,9 @@ async function runRoute() {
   const data = await api(`/routes/${encodeURIComponent(value("target"))}?${query}`);
 
   out.innerHTML = "";
-  if (data.already_owned) {
-    out.appendChild(el("p", "empty", t("alreadyOwned")));
-    // Leaving "owned" empty defaults to every wild-catchable pal, so a target
-    // that is itself catchable always lands here -- trivially true, but not
-    // what someone picking a breeding target actually wants to know. Show
-    // any pair that breeds it anyway, catchable or not, so the answer is
-    // never just a dead end.
-    const parentsData = await api(`/pals/${encodeURIComponent(data.target)}/parents`);
-    if (parentsData.pairs.length) {
-      out.appendChild(el("p", "meta", t("alsoBredFrom")));
-      for (const pair of parentsData.pairs.slice(0, 20)) {
-        const row = el("div", "step");
-        row.appendChild(formula(pair, [" + "]));
-        out.appendChild(row);
-      }
-      if (parentsData.pairs.length > 20) {
-        out.appendChild(el("p", "meta", t("andMore")(parentsData.pairs.length - 20)));
-      }
-    }
-    return;
-  }
+  // The backend never short-circuits on "you already have this" -- it always
+  // looks for a real recipe, so `steps` here is either a genuine route or the
+  // request already failed with a clear error before reaching this point.
   out.appendChild(el("p", "meta", t("routeSummary")(data.generations, data.distinct_steps)));
   for (const step of data.steps) {
     const row = el("div", "step");
