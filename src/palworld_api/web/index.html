@@ -260,6 +260,7 @@ const I18N = {
     specialCombo: "combo especial", sameSpecies: "misma especie",
     genderMale: "macho", genderFemale: "hembra",
     alreadyOwned: "Ya lo tienes: no hace falta criar nada.",
+    alsoBredFrom: "Aun así, estas parejas también lo producirían:",
     routeSummary: (g, s) => `${g} generación(es), ${s} cruce(s) distintos.`,
     routeAlternatives: "Alternativas para el último paso: ",
     breedRequires: "Requiere: ",
@@ -320,6 +321,7 @@ const I18N = {
     specialCombo: "special combo", sameSpecies: "same species",
     genderMale: "male", genderFemale: "female",
     alreadyOwned: "You already have it: no breeding needed.",
+    alsoBredFrom: "It can also be bred from these pairs:",
     routeSummary: (g, s) => `${g} generation(s), ${s} distinct cross(es).`,
     routeAlternatives: "Alternatives for the final step: ",
     breedRequires: "Requires: ",
@@ -749,7 +751,6 @@ function el(tag, className, text) {
 }
 
 async function runRoute() {
-  const params = new URLSearchParams({ target: value("target"), strategy: value("strategy") });
   const owned = value("owned");
   const query = new URLSearchParams({ strategy: value("strategy") });
   if (owned) for (const o of owned.split(",").map((s) => s.trim()).filter(Boolean)) query.append("owned", o);
@@ -758,6 +759,23 @@ async function runRoute() {
   out.innerHTML = "";
   if (data.already_owned) {
     out.appendChild(el("p", "empty", t("alreadyOwned")));
+    // Leaving "owned" empty defaults to every wild-catchable pal, so a target
+    // that is itself catchable always lands here -- trivially true, but not
+    // what someone picking a breeding target actually wants to know. Show
+    // any pair that breeds it anyway, catchable or not, so the answer is
+    // never just a dead end.
+    const parentsData = await api(`/pals/${encodeURIComponent(data.target)}/parents`);
+    if (parentsData.pairs.length) {
+      out.appendChild(el("p", "meta", t("alsoBredFrom")));
+      for (const pair of parentsData.pairs.slice(0, 20)) {
+        const row = el("div", "step");
+        row.appendChild(formula(pair, [" + "]));
+        out.appendChild(row);
+      }
+      if (parentsData.pairs.length > 20) {
+        out.appendChild(el("p", "meta", t("andMore")(parentsData.pairs.length - 20)));
+      }
+    }
     return;
   }
   out.appendChild(el("p", "meta", t("routeSummary")(data.generations, data.distinct_steps)));
